@@ -1,0 +1,32 @@
+# Java / Spring Boot
+target/
+*.class
+*.jar
+*.war
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE files
+.idea/
+*.iml
+.project
+.classpath
+.settings/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# React / Node
+node_modules/
+build/
+dist/
+
+# Environment files
+.env
+application-local.properties
