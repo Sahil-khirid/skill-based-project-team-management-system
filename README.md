@@ -18,9 +18,18 @@ below draw a clear line between what is implemented today and what is planned.
 - ADR documenting the approved technology version baseline
   (`docs/architecture/adr/ADR-001-technology-version-baseline.md`).
 
+### Implemented (Milestone 2 — API Gateway Foundation)
+
+- Standalone reactive API Gateway (`backend/api-gateway`, Spring Cloud Gateway
+  Server WebFlux), application name `API-GATEWAY`, listening on port `8080`.
+- Registers with the Eureka Server as a discovery client.
+- Spring Boot Actuator `health` endpoint on the API Gateway.
+- No downstream routes, authentication, JWT security, or database code yet —
+  see "API Gateway" section below.
+
 ### Planned (not yet implemented)
 
-- API Gateway
+- API Gateway routes to downstream services
 - Auth Service and JWT-based security
 - User & Skill Service
 - Project & Team Service
@@ -31,7 +40,8 @@ below draw a clear line between what is implemented today and what is planned.
 Advanced deployment infrastructure (Docker, CI/CD, Kubernetes) is excluded from
 Version 1.
 
-Do not assume any service other than Eureka Server is functional yet.
+Do not assume any service other than Eureka Server and API Gateway is
+functional yet.
 
 ## Requirements
 
@@ -86,11 +96,74 @@ Once running:
 
 The Eureka Server does **not** require MySQL or any database connection.
 
+## API Gateway
+
+- Service name: `API-GATEWAY`
+- Port: `8080`
+- Purpose: single entry point for backend APIs, routing requests to the
+  backend microservices as they come online.
+- Registers with Eureka at: `http://localhost:8761/eureka/` (override via the
+  `EUREKA_DEFAULT_ZONE` environment variable — see `.env.example`).
+
+### Startup order
+
+1. Eureka Server (port `8761`)
+2. API Gateway (port `8080`)
+
+**Windows**
+
+```
+mvnw.cmd -pl backend/api-gateway spring-boot:run
+```
+
+**Linux / macOS**
+
+```
+./mvnw -pl backend/api-gateway spring-boot:run
+```
+
+Once running, the Gateway registers with Eureka and the dashboard
+(http://localhost:8761/) should list an `API-GATEWAY` instance.
+
+Or run the executable JAR directly:
+
+```
+java -jar backend/api-gateway/target/api-gateway-0.1.0-SNAPSHOT.jar
+```
+
+- Actuator health check: http://localhost:8080/actuator/health
+
+Routes to downstream services and JWT-based security are intentionally
+excluded from this foundation milestone; they are planned for later
+milestones.
+
 ## Secrets
 
-Do not commit real secrets, credentials, or `.env` files. Use `.env.example` as the
-template for any environment variables a future service may need; copy it to a local,
-git-ignored `.env` and fill in real values there.
+`.env.example` is a safe reference template — it contains no secrets. Plain Spring
+Boot does **not** automatically load a `.env` file, so simply copying it to `.env`
+has no effect on its own. Environment variables must be set through the operating
+system shell, your IDE's run configuration, or the deployment environment.
+
+Real secrets and local `.env` files must never be committed.
+
+To override the Eureka registry URL the API Gateway uses:
+
+**Windows (cmd.exe)**
+
+```
+set EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
+mvnw.cmd -pl backend/api-gateway spring-boot:run
+```
+
+**Windows (PowerShell)**
+
+```
+$env:EUREKA_DEFAULT_ZONE="http://localhost:8761/eureka/"
+.\mvnw.cmd -pl backend/api-gateway spring-boot:run
+```
+
+If the variable is not set, the API Gateway falls back to its default of
+`http://localhost:8761/eureka/`.
 
 ## Troubleshooting
 
