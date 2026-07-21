@@ -27,21 +27,36 @@ below draw a clear line between what is implemented today and what is planned.
 - No downstream routes, authentication, JWT security, or database code yet —
   see "API Gateway" section below.
 
+### Implemented (Milestone 3 — Auth Service Foundation and Registration)
+
+- Standalone Auth Service (`backend/auth-service`), application name
+  `AUTH-SERVICE`, listening on port `8081`.
+- Registers with the Eureka Server as a discovery client.
+- Owns its own MySQL database, `skillteam_auth`, with schema managed
+  exclusively through Flyway (`spring.jpa.hibernate.ddl-auto: validate`).
+- User registration endpoint (`POST /api/v1/auth/register`) with input
+  validation, email normalization, duplicate-email rejection, and BCrypt
+  password hashing.
+- Spring Boot Actuator `health` endpoint on the Auth Service.
+- Login, JWT issuance/validation, refresh tokens, Gateway routing,
+  authorization filters, password reset, email verification, and
+  user-profile data are intentionally **excluded** from this milestone — see
+  "Auth Service" below.
+
 ### Planned (not yet implemented)
 
 - API Gateway routes to downstream services
-- Auth Service and JWT-based security
+- Auth Service login and JWT-based security
 - User & Skill Service
 - Project & Team Service
 - Task & Progress Service
 - React (Vite) frontend
-- MySQL-backed persistence, Spring Data JPA, Flyway migrations
 
 Advanced deployment infrastructure (Docker, CI/CD, Kubernetes) is excluded from
 Version 1.
 
-Do not assume any service other than Eureka Server and API Gateway is
-functional yet.
+Do not assume any service other than Eureka Server, API Gateway, and Auth
+Service is functional yet.
 
 ## Requirements
 
@@ -136,6 +151,161 @@ java -jar backend/api-gateway/target/api-gateway-0.1.0-SNAPSHOT.jar
 Routes to downstream services and JWT-based security are intentionally
 excluded from this foundation milestone; they are planned for later
 milestones.
+
+## Auth Service
+
+- Service name: `AUTH-SERVICE`
+- Port: `8081`
+- Purpose: user registration and credential storage for the platform.
+- Registers with Eureka at: `http://localhost:8761/eureka/` (override via the
+  `EUREKA_DEFAULT_ZONE` environment variable — see `.env.example`).
+- Database ownership: the Auth Service owns and exclusively accesses its own
+  MySQL database, `skillteam_auth`. It does not read or write any other
+  service's database. Schema changes are applied only through Flyway
+  migrations (`backend/auth-service/src/main/resources/db/migration`);
+  Hibernate is configured with `ddl-auto: validate` and never creates or
+  alters tables.
+
+Login, JWT issuance/validation, refresh tokens, password reset, email
+verification, Gateway routing, authorization filters, and user-profile data
+are **intentionally not implemented** in this milestone. Only registration
+exists today.
+
+### MySQL setup
+
+Create the Auth Service database before starting it against MySQL:
+
+```sql
+CREATE DATABASE skillteam_auth
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+### Required environment variables
+
+See `.env.example` for the full reference template. The Auth Service reads:
+
+| Variable             | Purpose                                   | Default (if unset)                                                                         |
+|-----------------------|--------------------------------------------|---------------------------------------------------------------------------------------------|
+| `EUREKA_DEFAULT_ZONE` | Eureka registry URL                        | `http://localhost:8761/eureka/`                                                             |
+| `AUTH_DB_URL`         | JDBC URL for `skillteam_auth`              | `jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC` |
+| `AUTH_DB_USERNAME`    | Database username                          | `root`                                                                                       |
+| `AUTH_DB_PASSWORD`    | Database password                          | *(none — must be set for a real MySQL connection; never commit a real value)*               |
+
+**Windows (cmd.exe)**
+
+```
+set AUTH_DB_URL=jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+set AUTH_DB_USERNAME=root
+set AUTH_DB_PASSWORD=your_local_password_here
+set EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
+mvnw.cmd -pl backend/auth-service spring-boot:run
+```
+
+**Windows (PowerShell)**
+
+```
+$env:AUTH_DB_URL="jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+$env:AUTH_DB_USERNAME="root"
+$env:AUTH_DB_PASSWORD="your_local_password_here"
+$env:EUREKA_DEFAULT_ZONE="http://localhost:8761/eureka/"
+.\mvnw.cmd -pl backend/auth-service spring-boot:run
+```
+
+### Startup order
+
+1. MySQL, with the `skillteam_auth` database created (see above)
+2. Eureka Server (port `8761`)
+3. Auth Service (port `8081`)
+
+**Windows**
+
+```
+mvnw.cmd -pl backend/auth-service spring-boot:run
+```
+
+**Linux / macOS**
+
+```
+./mvnw -pl backend/auth-service spring-boot:run
+```
+
+Once running, the Auth Service registers with Eureka and the dashboard
+(http://localhost:8761/) should list an `AUTH-SERVICE` instance.
+
+Or run the executable JAR directly:
+
+```
+java -jar backend/auth-service/target/auth-service-0.1.0-SNAPSHOT.jar
+```
+
+- Actuator health check: http://localhost:8081/actuator/health
+
+### Registration endpoint
+
+`POST /api/v1/auth/register`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "Password@123"
+}
+```
+
+- `email` is required, must be a valid email address, is trimmed and
+  normalized to lowercase, and must not exceed 254 characters.
+- `password` is required, must be between 8 and 72 characters, and is never
+  trimmed or otherwise modified.
+- Clients cannot set `id`, `role`, `enabled`, `passwordHash`, `createdAt`, or
+  `updatedAt` — every registration is created with `role = USER` and
+  `enabled = true`.
+
+Successful response — `201 Created`:
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "role": "USER",
+  "enabled": true,
+  "createdAt": "2026-07-21T10:15:30Z"
+}
+```
+
+The response never includes the password or its hash.
+
+Duplicate email — `409 Conflict`:
+
+```json
+{
+  "timestamp": "2026-07-21T10:16:00Z",
+  "status": 409,
+  "error": "Conflict",
+  "message": "An account with this email already exists.",
+  "path": "/api/v1/auth/register",
+  "fieldErrors": []
+}
+```
+
+Registering with an email that already exists never reveals whether a
+password or any other credential detail matches — only that the email is
+taken.
+
+Invalid input (bad email format, blank/short password, malformed JSON) —
+`400 Bad Request`, with the same error shape and populated `fieldErrors`
+where applicable.
+
+### Running Auth Service tests
+
+```
+mvnw.cmd -pl backend/auth-service test
+```
+
+Tests run against an in-memory H2 database in MySQL compatibility mode,
+applying the real Flyway migration — no running MySQL or Eureka Server is
+required.
 
 ## Secrets
 

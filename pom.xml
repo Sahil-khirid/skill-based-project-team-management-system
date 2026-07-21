@@ -15,6 +15,7 @@
     <modules>
         <module>backend/eureka-server</module>
         <module>backend/api-gateway</module>
+        <module>backend/auth-service</module>
     </modules>
 
     <properties>
