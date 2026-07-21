@@ -5,3 +5,13 @@
 eureka:
   client:
     enabled: false
+
+# Test-only Base64 secret (decodes to 64 bytes of the ASCII phrase
+# "test-only-jwt-signing-secret-for-auth-service-unit-tests-32bytes").
+# Not a production value; never use this outside automated tests.
+gateway:
+  security:
+    jwt:
+      secret-base64: dGVzdC1vbmx5LWp3dC1zaWduaW5nLXNlY3JldC1mb3ItYXV0aC1zZXJ2aWNlLXVuaXQtdGVzdHMtMzJieXRlcw==
+      issuer: skillteam-auth-service
+      audience: skillteam-api
