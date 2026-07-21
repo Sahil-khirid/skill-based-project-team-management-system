@@ -1,11 +1,18 @@
 package com.skillteam.auth.controller;
 
+import com.skillteam.auth.dto.AuthenticatedUserResponse;
+import com.skillteam.auth.dto.LoginRequest;
+import com.skillteam.auth.dto.LoginResponse;
 import com.skillteam.auth.dto.RegisterRequest;
 import com.skillteam.auth.dto.RegisterResponse;
+import com.skillteam.auth.security.AuthUserPrincipal;
+import com.skillteam.auth.service.AuthLoginService;
 import com.skillteam.auth.service.AuthRegistrationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,14 +23,29 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthRegistrationService authRegistrationService;
+    private final AuthLoginService authLoginService;
 
-    public AuthController(AuthRegistrationService authRegistrationService) {
+    public AuthController(AuthRegistrationService authRegistrationService, AuthLoginService authLoginService) {
         this.authRegistrationService = authRegistrationService;
+        this.authLoginService = authLoginService;
     }
 
     @PostMapping("/register")
     public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         RegisterResponse response = authRegistrationService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authLoginService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<AuthenticatedUserResponse> me(@AuthenticationPrincipal AuthUserPrincipal principal) {
+        AuthenticatedUserResponse response =
+                new AuthenticatedUserResponse(principal.getId(), principal.getEmail(), principal.getRole());
+        return ResponseEntity.ok(response);
     }
 }
