@@ -23,6 +23,16 @@ eureka:
     register-with-eureka: false
     fetch-registry: false
 
+# Test-only Base64 secret (decodes to 64 bytes of the ASCII phrase
+# "test-only-jwt-signing-secret-for-auth-service-unit-tests-32bytes").
+# Not a production value; never use this outside automated tests.
+auth:
+  jwt:
+    secret-base64: dGVzdC1vbmx5LWp3dC1zaWduaW5nLXNlY3JldC1mb3ItYXV0aC1zZXJ2aWNlLXVuaXQtdGVzdHMtMzJieXRlcw==
+    issuer: skillteam-auth-service
+    audience: skillteam-api
+    access-token-ttl: PT15M
+
 management:
   endpoints:
     web:
