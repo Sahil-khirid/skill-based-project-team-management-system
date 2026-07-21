@@ -43,10 +43,27 @@ below draw a clear line between what is implemented today and what is planned.
   user-profile data are intentionally **excluded** from this milestone — see
   "Auth Service" below.
 
+### Implemented (Milestone 4 — Auth Login and JWT Security Foundation)
+
+- Email/password login endpoint (`POST /api/v1/auth/login`) that
+  authenticates against the existing `auth_users` table and issues a
+  short-lived, HS256-signed JWT access token.
+- Stateless Spring Security: no HTTP session, no session cookie, JSON-only
+  401/403 error responses (no HTML login page, no redirects).
+- A servlet `OncePerRequestFilter` that reads the `Authorization: Bearer`
+  header, validates the token (signature, issuer, audience, expiration), and
+  re-checks the account's current enabled state in the database on every
+  request.
+- A protected identity endpoint (`GET /api/v1/auth/me`) that returns the
+  authenticated user's id, email, and role.
+- Refresh tokens, logout/token revocation, API Gateway JWT filtering,
+  OAuth2/social login, password reset, and email verification are
+  intentionally **excluded** from this milestone — see "Auth Service" below.
+
 ### Planned (not yet implemented)
 
-- API Gateway routes to downstream services
-- Auth Service login and JWT-based security
+- API Gateway routes to downstream services and Gateway-level JWT filtering
+- Auth Service refresh tokens and logout/token revocation
 - User & Skill Service
 - Project & Team Service
 - Task & Progress Service
@@ -166,10 +183,10 @@ milestones.
   Hibernate is configured with `ddl-auto: validate` and never creates or
   alters tables.
 
-Login, JWT issuance/validation, refresh tokens, password reset, email
-verification, Gateway routing, authorization filters, and user-profile data
-are **intentionally not implemented** in this milestone. Only registration
-exists today.
+Registration, login, and JWT issuance/validation are implemented. Refresh
+tokens, logout/token revocation, password reset, email verification, Gateway
+routing, Gateway-level JWT filtering, and user-profile data are
+**intentionally not implemented** in this milestone.
 
 ### MySQL setup
 
@@ -191,6 +208,7 @@ See `.env.example` for the full reference template. The Auth Service reads:
 | `AUTH_DB_URL`         | JDBC URL for `skillteam_auth`              | `jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC` |
 | `AUTH_DB_USERNAME`    | Database username                          | `root`                                                                                       |
 | `AUTH_DB_PASSWORD`    | Database password                          | *(none — must be set for a real MySQL connection; never commit a real value)*               |
+| `JWT_SECRET_BASE64`   | Base64-encoded HS256 JWT signing secret (decoded key must be ≥ 32 bytes) | *(none — required; there is no production fallback secret)*            |
 
 **Windows (cmd.exe)**
 
@@ -199,6 +217,7 @@ set AUTH_DB_URL=jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowPub
 set AUTH_DB_USERNAME=root
 set AUTH_DB_PASSWORD=your_local_password_here
 set EUREKA_DEFAULT_ZONE=http://localhost:8761/eureka/
+set JWT_SECRET_BASE64=your_base64_secret_here
 mvnw.cmd -pl backend/auth-service spring-boot:run
 ```
 
@@ -209,8 +228,13 @@ $env:AUTH_DB_URL="jdbc:mysql://localhost:3306/skillteam_auth?useSSL=false&allowP
 $env:AUTH_DB_USERNAME="root"
 $env:AUTH_DB_PASSWORD="your_local_password_here"
 $env:EUREKA_DEFAULT_ZONE="http://localhost:8761/eureka/"
+$env:JWT_SECRET_BASE64="your_base64_secret_here"
 .\mvnw.cmd -pl backend/auth-service spring-boot:run
 ```
+
+The Auth Service will **fail to start** if `JWT_SECRET_BASE64` is unset, blank,
+not valid Base64, or decodes to fewer than 32 bytes — there is no production
+fallback secret. See "JWT access tokens" below for how to generate one.
 
 ### Startup order
 
@@ -296,6 +320,138 @@ taken.
 Invalid input (bad email format, blank/short password, malformed JSON) —
 `400 Bad Request`, with the same error shape and populated `fieldErrors`
 where applicable.
+
+### JWT access tokens
+
+- Signing algorithm: HS256 (HMAC-SHA256).
+- Access-token lifetime: fixed at **15 minutes** for this milestone (not
+  configurable via environment variable).
+- Issuer: `skillteam-auth-service`
+- Audience: `skillteam-api`
+- Signing secret: read only from the `JWT_SECRET_BASE64` environment
+  variable (Base64-encoded, decoded key must be at least 32 bytes). There is
+  **no production fallback secret** — the service fails to start without it.
+- Refresh tokens, logout/token revocation, and API Gateway JWT filtering are
+  intentionally excluded from this milestone.
+- **JWT access tokens must never be logged or committed to source control.**
+
+Generate a random 32-byte Base64 secret (PowerShell):
+
+```powershell
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+[Convert]::ToBase64String($bytes)
+```
+
+Set it for the current session before starting the service:
+
+**Windows (PowerShell)**
+
+```
+$env:JWT_SECRET_BASE64="<paste the generated value here>"
+```
+
+**Windows (cmd.exe)**
+
+```
+set JWT_SECRET_BASE64=<paste the generated value here>
+```
+
+### Login endpoint
+
+`POST /api/v1/auth/login`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "Password@123"
+}
+```
+
+- `email` is required, must be a valid email address, is trimmed and
+  normalized to lowercase, and must not exceed 254 characters.
+- `password` is required, must be between 8 and 72 characters, and is never
+  trimmed or otherwise modified.
+
+Successful response — `200 OK`:
+
+```json
+{
+  "accessToken": "<jwt>",
+  "tokenType": "Bearer",
+  "expiresIn": 900,
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "role": "USER"
+  }
+}
+```
+
+`expiresIn` is in seconds (900 = 15 minutes). The response never includes a
+refresh token, the password, or the password hash.
+
+Invalid email, invalid password, an unknown account, and a disabled account
+all return the identical response — `401 Unauthorized`:
+
+```json
+{
+  "timestamp": "2026-07-21T10:16:00Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Invalid email or password.",
+  "path": "/api/v1/auth/login",
+  "fieldErrors": []
+}
+```
+
+This response never reveals whether an account exists for the given email.
+
+### Protected identity endpoint
+
+`GET /api/v1/auth/me`
+
+Requires an `Authorization: Bearer <access-token>` header obtained from the
+login endpoint.
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+```
+
+Successful response — `200 OK`:
+
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "role": "USER"
+}
+```
+
+This endpoint represents authentication identity only — no profile data is
+returned; profile data belongs to the (not yet implemented) User & Skill
+Service.
+
+Missing, expired, malformed, or invalid-signature tokens all return the same
+JSON shape — `401 Unauthorized`:
+
+```json
+{
+  "timestamp": "2026-07-21T10:16:00Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Authentication is required.",
+  "path": "/api/v1/auth/me",
+  "fieldErrors": []
+}
+```
+
+There is no HTML login page and no redirect — every security failure is a
+plain JSON response. A request that is authenticated but not authorized for
+a given resource returns `403 Forbidden` with `"message": "Access is
+denied."` in the same error shape.
 
 ### Running Auth Service tests
 
