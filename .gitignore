@@ -4,10 +4,8 @@ target/
 *.jar
 *.war
 
-# Maven
-.mvn/
-mvnw
-mvnw.cmd
+# Maven Wrapper (mvnw, mvnw.cmd, .mvn/wrapper) is intentionally NOT ignored.
+# It must be committed so all team members build with the same Maven version.
 
 # IDE files
 .idea/
@@ -19,6 +17,10 @@ mvnw.cmd
 # VS Code
 .vscode/
 
+# Eclipse
+.metadata/
+bin/
+
 # Logs
 *.log
 
@@ -27,6 +29,22 @@ node_modules/
 build/
 dist/
 
-# Environment files
+# Environment / secrets — local, machine-specific configuration only.
+# .env.example is intentionally NOT ignored; it is safe to commit.
 .env
+.env.*
+!.env.example
 application-local.properties
+application-local.yml
+application-local.yaml
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.swp
