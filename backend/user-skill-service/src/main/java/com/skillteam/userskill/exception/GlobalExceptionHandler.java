@@ -79,6 +79,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(UserAvailabilityAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUserAvailabilityAlreadyExists(UserAvailabilityAlreadyExistsException ex,
+                                                                               HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(UserAvailabilityNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserAvailabilityNotFound(UserAvailabilityNotFoundException ex,
+                                                                          HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,
