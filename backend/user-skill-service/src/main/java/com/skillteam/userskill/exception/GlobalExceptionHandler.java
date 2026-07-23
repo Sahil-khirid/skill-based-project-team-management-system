@@ -67,6 +67,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(UserSkillAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUserSkillAlreadyExists(UserSkillAlreadyExistsException ex,
+                                                                        HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(UserSkillNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleUserSkillNotFound(UserSkillNotFoundException ex,
+                                                                    HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,
