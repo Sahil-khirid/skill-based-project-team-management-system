@@ -1,7 +1,0 @@
-# Test-only override: disables Eureka client registration/discovery so the
-# application context can load in CI/local test runs without a running
-# Eureka Server. Production/local configuration (application.yml under
-# src/main/resources) is untouched.
-eureka:
-  client:
-    enabled: false
