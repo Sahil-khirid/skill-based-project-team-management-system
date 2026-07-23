@@ -13,6 +13,14 @@ spring:
               uri: lb://AUTH-SERVICE
               predicates:
                 - Path=/api/v1/auth/**
+            - id: user-skill-users
+              uri: lb://USER-SKILL-SERVICE
+              predicates:
+                - Path=/api/v1/users/**
+            - id: user-skill-skills
+              uri: lb://USER-SKILL-SERVICE
+              predicates:
+                - Path=/api/v1/skills/**
           discovery:
             locator:
               # Only the explicit route above is exposed; automatic discovery
