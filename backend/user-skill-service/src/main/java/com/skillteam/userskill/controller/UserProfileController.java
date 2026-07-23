@@ -31,6 +31,8 @@ public class UserProfileController {
     public ResponseEntity<UserProfileResponse> create(HttpServletRequest httpRequest,
                                                         @Valid @RequestBody UserProfileRequest request) {
         Long authUserId = identityHeaderResolver.resolve(httpRequest);
+        identityHeaderResolver.resolveRole(httpRequest);
+
         UserProfileResponse response = userProfileService.create(authUserId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -38,6 +40,8 @@ public class UserProfileController {
     @GetMapping
     public ResponseEntity<UserProfileResponse> get(HttpServletRequest httpRequest) {
         Long authUserId = identityHeaderResolver.resolve(httpRequest);
+        identityHeaderResolver.resolveRole(httpRequest);
+
         return ResponseEntity.ok(userProfileService.get(authUserId));
     }
 
@@ -45,6 +49,8 @@ public class UserProfileController {
     public ResponseEntity<UserProfileResponse> update(HttpServletRequest httpRequest,
                                                         @Valid @RequestBody UserProfileRequest request) {
         Long authUserId = identityHeaderResolver.resolve(httpRequest);
+        identityHeaderResolver.resolveRole(httpRequest);
+
         return ResponseEntity.ok(userProfileService.update(authUserId, request));
     }
 }
