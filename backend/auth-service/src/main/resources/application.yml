@@ -32,6 +32,8 @@ auth:
     issuer: skillteam-auth-service
     audience: skillteam-api
     access-token-ttl: PT15M
+  refresh-token:
+    ttl: ${REFRESH_TOKEN_TTL:P7D}
 
 management:
   endpoints:

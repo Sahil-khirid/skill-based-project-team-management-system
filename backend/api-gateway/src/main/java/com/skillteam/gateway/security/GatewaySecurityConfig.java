@@ -48,6 +48,8 @@ public class GatewaySecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                         .pathMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .anyExchange().authenticated());
 

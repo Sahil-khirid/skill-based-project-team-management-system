@@ -4,6 +4,7 @@ import com.skillteam.auth.config.JwtProperties;
 import com.skillteam.auth.entity.AuthUser;
 import com.skillteam.auth.entity.Role;
 import com.skillteam.auth.repository.AuthUserRepository;
+import com.skillteam.auth.repository.RefreshTokenRepository;
 import com.skillteam.auth.security.JwtService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ class AuthMeTest {
     private AuthUserRepository authUserRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -54,6 +58,7 @@ class AuthMeTest {
 
     @AfterEach
     void cleanUp() {
+        refreshTokenRepository.deleteAll();
         authUserRepository.deleteAll();
     }
 

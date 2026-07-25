@@ -86,10 +86,30 @@ below draw a clear line between what is implemented today and what is planned.
   Task & Progress services are intentionally **excluded** from this
   milestone — see "API Gateway" below.
 
+### Implemented (Milestone 6 — Auth Refresh Token Rotation and Logout)
+
+- Opaque, cryptographically random refresh tokens (not JWTs) are issued
+  alongside the JWT access token on successful login.
+- Only the SHA-256 hash of a refresh token is ever stored, in the Auth
+  Service's own MySQL database (`refresh_tokens` table, `skillteam_auth`);
+  the raw token is returned to the client once and never persisted.
+- Default refresh-token lifetime is **7 days**, configurable via the
+  `REFRESH_TOKEN_TTL` environment variable — independent of and without any
+  change to the 15-minute JWT access-token lifetime.
+- `POST /api/v1/auth/refresh` rotates a valid refresh token: it issues a new
+  access token and a new refresh token, and revokes the old refresh token so
+  it can never be used again (no lifetime extension, no reuse).
+- `POST /api/v1/auth/logout` revokes a supplied active refresh token without
+  deleting its database row and without server-side revocation of any
+  already-issued JWT access tokens.
+- Both endpoints are public at the Auth Service and at the API Gateway (the
+  refresh/logout token itself is the credential) — see "Public vs. protected
+  routes" below.
+- Password reset, email verification, and OAuth2/social login remain **not
+  implemented**.
+
 ### Planned (not yet implemented)
 
-- Auth Service refresh tokens and logout/token revocation
-- User & Skill Service
 - Project & Team Service
 - Task & Progress Service
 - React (Vite) frontend
@@ -98,8 +118,15 @@ below draw a clear line between what is implemented today and what is planned.
 Advanced deployment infrastructure (Docker, CI/CD, Kubernetes) is excluded from
 Version 1.
 
-Do not assume any service other than Eureka Server, API Gateway, and Auth
-Service is functional yet.
+Current implemented backend services are:
+
+- Eureka Server
+- API Gateway
+- Auth Service
+- User & Skill Service
+
+Do not assume Project & Team Service or Task & Progress Service are
+functional yet.
 
 ## Requirements
 
@@ -163,19 +190,22 @@ The Eureka Server does **not** require MySQL or any database connection.
   directly (port `8081`) except during local debugging.
 - Registers with Eureka at: `http://localhost:8761/eureka/` (override via the
   `EUREKA_DEFAULT_ZONE` environment variable — see `.env.example`).
-- Routes for the User & Skill, Project & Team, and Task & Progress services
-  are intentionally **excluded** — those services are not implemented yet.
+- Routes for the User & Skill Service (`/api/v1/users/**` and
+  `/api/v1/skills/**`) are implemented. Routes for the Project & Team and
+  Task & Progress services are not implemented yet.
 - CORS configuration is intentionally **excluded** from this milestone;
   frontend integration is deferred.
 
-### Auth Service route
+### Gateway routes
 
-| Route id       | Predicate               | Destination           |
-|----------------|--------------------------|------------------------|
-| `auth-service` | `Path=/api/v1/auth/**`   | `lb://AUTH-SERVICE` (Eureka load-balanced) |
+| Route id             | Predicate                  | Destination                                |
+|-----------------------|------------------------------|----------------------------------------------|
+| `auth-service`        | `Path=/api/v1/auth/**`      | `lb://AUTH-SERVICE` (Eureka load-balanced)   |
+| `user-skill-users`    | `Path=/api/v1/users/**`     | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
+| `user-skill-skills`   | `Path=/api/v1/skills/**`    | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
 
-The Gateway does not rewrite the path — `/api/v1/auth/**` reaches the Auth
-Service with the same path it was requested on.
+The Gateway does not rewrite the path — each route reaches its downstream
+service with the same path it was requested on.
 
 ### Public vs. protected routes
 
@@ -183,6 +213,8 @@ Service with the same path it was requested on.
 |-------------------------------|----------------------------------|
 | `POST /api/v1/auth/register`  | Public — no JWT required         |
 | `POST /api/v1/auth/login`     | Public — no JWT required         |
+| `POST /api/v1/auth/refresh`   | Public — no JWT required (the refresh token itself is the credential) |
+| `POST /api/v1/auth/logout`    | Public — no JWT required (the refresh token itself is the credential) |
 | `GET /actuator/health`        | Public — no JWT required         |
 | `GET /api/v1/auth/me`         | Protected — valid JWT required   |
 | Everything else                | Protected — valid JWT required   |
@@ -360,11 +392,12 @@ Authorization: Bearer <accessToken>
   Hibernate is configured with `ddl-auto: validate` and never creates or
   alters tables.
 
-Registration, login, and JWT issuance/validation are implemented, and Auth
-traffic is routed through the API Gateway (see "API Gateway" above) with
-Gateway-level JWT filtering. Refresh tokens, logout/token revocation,
-password reset, email verification, and user-profile data are
-**intentionally not implemented** in this milestone.
+Registration, login, JWT access-token issuance/validation, opaque
+refresh-token issuance/rotation, and logout/token revocation are all
+implemented, and Auth traffic is routed through the API Gateway (see "API
+Gateway" above) with Gateway-level JWT filtering. Password reset, email
+verification, and user-profile data are **intentionally not implemented** in
+this milestone.
 
 ### MySQL setup
 
@@ -387,6 +420,7 @@ See `.env.example` for the full reference template. The Auth Service reads:
 | `AUTH_DB_USERNAME`    | Database username                          | `root`                                                                                       |
 | `AUTH_DB_PASSWORD`    | Database password                          | *(none — must be set for a real MySQL connection; never commit a real value)*               |
 | `JWT_SECRET_BASE64`   | Base64-encoded HS256 JWT signing secret (decoded key must be ≥ 32 bytes) | *(none — required; there is no production fallback secret)*            |
+| `REFRESH_TOKEN_TTL`   | ISO-8601 duration an opaque refresh token stays valid before rotation | `P7D`                                                                  |
 
 **Windows (cmd.exe)**
 
@@ -499,20 +533,52 @@ Invalid input (bad email format, blank/short password, malformed JSON) —
 `400 Bad Request`, with the same error shape and populated `fieldErrors`
 where applicable.
 
+### Access tokens vs. refresh tokens
+
+The Auth Service issues two distinct kinds of token, with different formats,
+lifetimes, and storage:
+
+| | Access token | Refresh token |
+|---|---|---|
+| Format | HS256-signed JWT | Opaque, cryptographically random string (**not** a JWT) |
+| Lifetime | 15 minutes, fixed | 7 days by default, configurable via `REFRESH_TOKEN_TTL` |
+| Storage | Not persisted — stateless, self-contained | Only its SHA-256 hash is persisted (`refresh_tokens` table in `skillteam_auth`); the raw value is never stored |
+| Used for | Authenticating requests (`Authorization: Bearer <accessToken>`) | Obtaining a new access token via `POST /api/v1/auth/refresh`, and ending a session via `POST /api/v1/auth/logout` |
+
 ### JWT access tokens
 
 - Signing algorithm: HS256 (HMAC-SHA256).
-- Access-token lifetime: fixed at **15 minutes** for this milestone (not
-  configurable via environment variable).
+- Access-token lifetime: fixed at **15 minutes** (not configurable via
+  environment variable).
 - Issuer: `skillteam-auth-service`
 - Audience: `skillteam-api`
 - Signing secret: read only from the `JWT_SECRET_BASE64` environment
   variable (Base64-encoded, decoded key must be at least 32 bytes). There is
   **no production fallback secret** — the service fails to start without it.
-- Refresh tokens and logout/token revocation are intentionally excluded from
-  this milestone. API Gateway JWT filtering is implemented — see "API
-  Gateway" above.
+- API Gateway JWT filtering is implemented — see "API Gateway" above.
 - **JWT access tokens must never be logged or committed to source control.**
+
+### Refresh tokens
+
+- Format: an opaque, cryptographically random token (SecureRandom, at least
+  256 bits), URL-safe Base64-encoded without padding — deliberately **not**
+  a JWT, so it carries no inspectable claims.
+- Lifetime: **7 days by default**, configurable via the `REFRESH_TOKEN_TTL`
+  environment variable (ISO-8601 duration; see `.env.example`). Independent
+  of, and unaffected by, the access-token lifetime.
+- Storage: only the token's SHA-256 hash is persisted, in the Auth Service's
+  own `refresh_tokens` table (`skillteam_auth` database). The raw token is
+  returned to the client exactly once, at issuance, and is never written to
+  the database or logs.
+- Rotation: each use at `POST /api/v1/auth/refresh` issues a brand-new
+  refresh token and immediately revokes the one that was presented — a used
+  refresh token can never be used again, and its lifetime is never extended.
+- Revocation: `POST /api/v1/auth/logout` revokes a supplied refresh token.
+  Revocation only affects refresh tokens; it does not invalidate any
+  already-issued JWT access token, which simply expires on its own after 15
+  minutes.
+- **Raw refresh tokens must never be logged or committed to source
+  control**, exactly like JWT access tokens.
 
 Generate a random 32-byte Base64 secret (PowerShell):
 
@@ -565,12 +631,15 @@ Successful response — `200 OK`:
     "id": 1,
     "email": "user@example.com",
     "role": "USER"
-  }
+  },
+  "refreshToken": "<opaque-refresh-token>"
 }
 ```
 
-`expiresIn` is in seconds (900 = 15 minutes). The response never includes a
-refresh token, the password, or the password hash.
+`expiresIn` is in seconds (900 = 15 minutes). `refreshToken` is the raw,
+opaque refresh token — it is returned only in this response and is never
+persisted in that form (see "Refresh tokens" above). The response never
+includes the password, the password hash, or any refresh-token hash.
 
 Invalid email, invalid password, an unknown account, and a disabled account
 all return the identical response — `401 Unauthorized`:
@@ -587,6 +656,87 @@ all return the identical response — `401 Unauthorized`:
 ```
 
 This response never reveals whether an account exists for the given email.
+
+### Refresh endpoint
+
+`POST /api/v1/auth/refresh`
+
+No access JWT is required. The refresh token in the request body is the
+credential. Clients should call this endpoint without an Authorization
+header.
+
+Request body:
+
+```json
+{
+  "refreshToken": "<opaque-refresh-token>"
+}
+```
+
+Successful response — `200 OK`:
+
+```json
+{
+  "accessToken": "<jwt>",
+  "tokenType": "Bearer",
+  "expiresIn": 900,
+  "refreshToken": "<new-opaque-refresh-token>"
+}
+```
+
+A successful call issues a brand-new access token and a brand-new refresh
+token, and revokes the refresh token that was presented — the old refresh
+token becomes permanently unusable, even for a second, immediately-following
+request. Its lifetime is never extended by a failed or successful call.
+
+An unknown token, an expired token, a revoked token, a token that was
+already rotated away (reused), and any other non-blank invalid token all
+return the same generic response — `401 Unauthorized`:
+
+```json
+{
+  "timestamp": "2026-07-21T10:16:00Z",
+  "status": 401,
+  "error": "Unauthorized",
+  "message": "Invalid or expired refresh token.",
+  "path": "/api/v1/auth/refresh",
+  "fieldErrors": []
+}
+```
+
+This response never reveals which of those conditions applied, or whether
+the submitted token ever existed. A blank refresh token is rejected as a
+`400 Bad Request` validation error instead, in the same shape used
+elsewhere in this API.
+
+### Logout endpoint
+
+`POST /api/v1/auth/logout`
+
+No access JWT is required. The refresh token in the request body is the
+credential. Clients should call this endpoint without an Authorization
+header.
+
+Request body:
+
+```json
+{
+  "refreshToken": "<opaque-refresh-token>"
+}
+```
+
+Successful response — `204 No Content` (empty body).
+
+If the supplied token is an active, valid refresh token, it is revoked (its
+database row is kept, not deleted) and can no longer be used at
+`POST /api/v1/auth/refresh`. Logout does **not** server-side revoke any
+already-issued JWT access token — an access token obtained before logout
+remains valid until it naturally expires (up to 15 minutes later).
+
+Logout is intentionally **non-enumerating**: an unknown refresh token, an
+already-revoked refresh token, and a token that was never issued by this
+server all receive the identical `204 No Content` response as a real, active
+token — the endpoint never reveals whether a given refresh token exists.
 
 ### Protected identity endpoint
 
@@ -610,7 +760,8 @@ Successful response — `200 OK`:
 ```
 
 This endpoint represents authentication identity only — no profile data is
-returned; profile data belongs to the (not yet implemented) User & Skill
+returned. Profile, skills, and availability data are owned by the
+implemented User & Skill Service (see its routes above), not by the Auth
 Service.
 
 Missing, expired, malformed, or invalid-signature tokens all return the same
