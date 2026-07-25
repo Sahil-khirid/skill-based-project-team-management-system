@@ -3,6 +3,8 @@ package com.skillteam.auth;
 import com.skillteam.auth.entity.AuthUser;
 import com.skillteam.auth.entity.Role;
 import com.skillteam.auth.repository.AuthUserRepository;
+import com.skillteam.auth.repository.RefreshTokenRepository;
+import com.skillteam.auth.security.RefreshTokenHasher;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -12,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,10 +50,20 @@ class AuthLoginTest {
     private AuthUserRepository authUserRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private RefreshTokenHasher refreshTokenHasher;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @AfterEach
     void cleanUp() {
+        refreshTokenRepository.deleteAll();
         authUserRepository.deleteAll();
     }
 
@@ -78,7 +91,63 @@ class AuthLoginTest {
                 .andExpect(jsonPath("$.user.role").value("USER"))
                 .andExpect(jsonPath("$.password").doesNotExist())
                 .andExpect(jsonPath("$.passwordHash").doesNotExist())
-                .andExpect(jsonPath("$.refreshToken").doesNotExist());
+                .andExpect(jsonPath("$.refreshToken").exists());
+    }
+
+    @Test
+    void successfulLoginReturnsAccessTokenAndRefreshToken() throws Exception {
+        createUser("tokens@example.com", true);
+
+        MvcResult result = mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("tokens@example.com", RAW_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String responseBody = result.getResponse().getContentAsString();
+        String accessToken = com.jayway.jsonpath.JsonPath.read(responseBody, "$.accessToken");
+        String refreshToken = com.jayway.jsonpath.JsonPath.read(responseBody, "$.refreshToken");
+
+        assertThat(accessToken).isNotBlank();
+        assertThat(refreshToken).isNotBlank();
+        assertThat(refreshToken).doesNotContain(".");
+    }
+
+    @Test
+    void rawRefreshTokenIsNotStoredInDatabase() throws Exception {
+        createUser("rawcheck@example.com", true);
+
+        MvcResult result = mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("rawcheck@example.com", RAW_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String rawRefreshToken = com.jayway.jsonpath.JsonPath.read(
+                result.getResponse().getContentAsString(), "$.refreshToken");
+
+        Integer matchingRawRows = jdbcTemplate.queryForObject(
+                "select count(*) from refresh_tokens where token_hash = ?", Integer.class, rawRefreshToken);
+
+        assertThat(matchingRawRows).isZero();
+    }
+
+    @Test
+    void storedTokenHashMatchesSha256OfReturnedRefreshToken() throws Exception {
+        createUser("hashcheck@example.com", true);
+
+        MvcResult result = mockMvc.perform(post(LOGIN_URL).contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("hashcheck@example.com", RAW_PASSWORD)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String rawRefreshToken = com.jayway.jsonpath.JsonPath.read(
+                result.getResponse().getContentAsString(), "$.refreshToken");
+
+        String expectedHash = refreshTokenHasher.hash(rawRefreshToken);
+
+        Integer matchingRows = jdbcTemplate.queryForObject(
+                "select count(*) from refresh_tokens where token_hash = ?", Integer.class, expectedHash);
+
+        assertThat(matchingRows).isEqualTo(1);
     }
 
     @Test

@@ -1,10 +1,9 @@
 package com.skillteam.auth.dto;
 
-public record LoginResponse(
+public record RefreshResponse(
         String accessToken,
         String tokenType,
         long expiresIn,
-        AuthenticatedUserResponse user,
         String refreshToken
 ) {
 }

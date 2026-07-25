@@ -55,6 +55,15 @@ class GatewayAuthSecurityIntegrationTest {
             recordRequest(exchange);
             respond(exchange, 200, "{\"id\":1,\"email\":\"user@example.com\",\"role\":\"USER\"}");
         });
+        mockAuthServer.createContext("/api/v1/auth/refresh", exchange -> {
+            recordRequest(exchange);
+            respond(exchange, 200, "{\"accessToken\":\"stub\",\"tokenType\":\"Bearer\",\"expiresIn\":900,\"refreshToken\":\"stub-refresh\"}");
+        });
+        mockAuthServer.createContext("/api/v1/auth/logout", exchange -> {
+            recordRequest(exchange);
+            exchange.sendResponseHeaders(204, -1);
+            exchange.close();
+        });
         mockAuthServer.setExecutor(null);
         mockAuthServer.start();
 
@@ -118,6 +127,24 @@ class GatewayAuthSecurityIntegrationTest {
         webTestClient.post().uri("/api/v1/auth/login")
                 .exchange()
                 .expectStatus().isOk();
+    }
+
+    @Test
+    void refreshIsAccessibleWithoutJwt() {
+        webTestClient.post().uri("/api/v1/auth/refresh")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue("{\"refreshToken\":\"some-refresh-token\"}")
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void logoutIsAccessibleWithoutJwt() {
+        webTestClient.post().uri("/api/v1/auth/logout")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .bodyValue("{\"refreshToken\":\"some-refresh-token\"}")
+                .exchange()
+                .expectStatus().isNoContent();
     }
 
     @Test
