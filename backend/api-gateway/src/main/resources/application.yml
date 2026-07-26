@@ -21,6 +21,10 @@ spring:
               uri: lb://USER-SKILL-SERVICE
               predicates:
                 - Path=/api/v1/skills/**
+            - id: project-team-service
+              uri: lb://PROJECT-TEAM-SERVICE
+              predicates:
+                - Path=/api/v1/projects/**
           discovery:
             locator:
               # Only the explicit route above is exposed; automatic discovery
