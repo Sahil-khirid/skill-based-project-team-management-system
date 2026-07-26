@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.boot.test.context.SpringBootTest.WebEnvironment.RANDOM_PORT;
@@ -34,6 +35,7 @@ class GatewayUserSkillRoutingIntegrationTest {
     private static HttpServer mockUserSkillServer;
     private static final Map<String, String> lastRequestHeaders = new ConcurrentHashMap<>();
     private static volatile String lastRequestPath;
+    private static final AtomicInteger skillsBackendRequestCount = new AtomicInteger();
 
     @Autowired
     private WebTestClient webTestClient;
@@ -47,6 +49,7 @@ class GatewayUserSkillRoutingIntegrationTest {
         });
         mockUserSkillServer.createContext("/api/v1/skills", exchange -> {
             recordRequest(exchange);
+            skillsBackendRequestCount.incrementAndGet();
             respond(exchange, 200, "[]");
         });
         mockUserSkillServer.setExecutor(null);
@@ -105,6 +108,10 @@ class GatewayUserSkillRoutingIntegrationTest {
 
     private String validToken() {
         return TestTokens.builder().subject("1").email("user@example.com").role("USER").build();
+    }
+
+    private String managerToken() {
+        return TestTokens.builder().subject("2").email("manager@example.com").role("PROJECT_MANAGER").build();
     }
 
     @Test
@@ -194,5 +201,105 @@ class GatewayUserSkillRoutingIntegrationTest {
         assertThat(header("X-Auth-User-Id")).isEqualTo("1");
         assertThat(header("X-Auth-User-Email")).isEqualTo("real@example.com");
         assertThat(header("X-Auth-User-Role")).isEqualTo("USER");
+    }
+
+    @Test
+    void userCannotCreateSkillAndBackendIsNotCalled() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.post().uri("/api/v1/skills")
+                .header("Authorization", "Bearer " + validToken())
+                .bodyValue("{\"name\":\"Java\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before);
+    }
+
+    @Test
+    void managerCanCreateSkillAndRequestReachesBackend() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.post().uri("/api/v1/skills")
+                .header("Authorization", "Bearer " + managerToken())
+                .bodyValue("{\"name\":\"Java\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before + 1);
+    }
+
+    @Test
+    void userCannotUpdateSkillAndBackendIsNotCalled() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.put().uri("/api/v1/skills/5")
+                .header("Authorization", "Bearer " + validToken())
+                .bodyValue("{\"name\":\"Java\"}")
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before);
+    }
+
+    @Test
+    void managerCanUpdateSkillAndRequestReachesBackend() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.put().uri("/api/v1/skills/5")
+                .header("Authorization", "Bearer " + managerToken())
+                .bodyValue("{\"name\":\"Java\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before + 1);
+    }
+
+    @Test
+    void userCannotDeleteSkillAndBackendIsNotCalled() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.delete().uri("/api/v1/skills/5")
+                .header("Authorization", "Bearer " + validToken())
+                .exchange()
+                .expectStatus().isForbidden();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before);
+    }
+
+    @Test
+    void managerCanDeleteSkillAndRequestReachesBackend() {
+        int before = skillsBackendRequestCount.get();
+
+        webTestClient.delete().uri("/api/v1/skills/5")
+                .header("Authorization", "Bearer " + managerToken())
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(skillsBackendRequestCount.get()).isEqualTo(before + 1);
+    }
+
+    @Test
+    void userCanListSkillCatalog() {
+        webTestClient.get().uri("/api/v1/skills")
+                .header("Authorization", "Bearer " + validToken())
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void userCanViewSingleSkill() {
+        webTestClient.get().uri("/api/v1/skills/5")
+                .header("Authorization", "Bearer " + validToken())
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void missingJwtOnSkillMutationReturns401NotForbidden() {
+        webTestClient.post().uri("/api/v1/skills")
+                .bodyValue("{\"name\":\"Java\"}")
+                .exchange()
+                .expectStatus().isUnauthorized();
     }
 }
