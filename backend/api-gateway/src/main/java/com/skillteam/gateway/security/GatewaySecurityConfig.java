@@ -51,6 +51,9 @@ public class GatewaySecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/logout").permitAll()
                         .pathMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/skills").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.PUT, "/api/v1/skills/**").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.DELETE, "/api/v1/skills/**").hasRole("PROJECT_MANAGER")
                         .anyExchange().authenticated());
 
         return http.build();
