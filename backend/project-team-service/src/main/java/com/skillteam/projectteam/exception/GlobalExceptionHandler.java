@@ -67,6 +67,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(ProjectRequiredSkillAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleProjectRequiredSkillAlreadyExists(
+            ProjectRequiredSkillAlreadyExistsException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(ProjectRequiredSkillNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleProjectRequiredSkillNotFound(
+            ProjectRequiredSkillNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,
