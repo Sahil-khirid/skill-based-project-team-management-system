@@ -55,6 +55,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(ProjectMemberAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleProjectMemberAlreadyExists(ProjectMemberAlreadyExistsException ex,
+                                                                            HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(ProjectMemberNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleProjectMemberNotFound(ProjectMemberNotFoundException ex,
+                                                                       HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,
