@@ -1,0 +1,33 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: TASK-PROGRESS-SERVICE
+  datasource:
+    url: ${TASK_PROGRESS_DB_URL:jdbc:mysql://localhost:3306/skillteam_task?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${TASK_PROGRESS_DB_USERNAME:root}
+    password: ${TASK_PROGRESS_DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka/}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
