@@ -54,6 +54,21 @@ public class GatewaySecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/api/v1/skills").hasRole("PROJECT_MANAGER")
                         .pathMatchers(HttpMethod.PUT, "/api/v1/skills/**").hasRole("PROJECT_MANAGER")
                         .pathMatchers(HttpMethod.DELETE, "/api/v1/skills/**").hasRole("PROJECT_MANAGER")
+                        // Must precede the internal user-skill lookup deny rule below: the single-segment
+                        // wildcard in "/api/v1/users/*/skills" also matches this literal "me" path, so the
+                        // public self-service route needs its own higher-precedence rule to stay reachable.
+                        .pathMatchers(HttpMethod.GET, "/api/v1/users/me/skills").authenticated()
+                        // Internal service-to-service lookup (User & Skill Service's InternalUserSkillController,
+                        // introduced for 7E-A/7E-B). Not a public client API - never expose it through the Gateway.
+                        .pathMatchers(HttpMethod.GET, "/api/v1/users/*/skills").denyAll()
+                        .pathMatchers(HttpMethod.POST, "/api/v1/projects",
+                                "/api/v1/projects/*/members",
+                                "/api/v1/projects/*/required-skills").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.PUT, "/api/v1/projects/*").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.DELETE, "/api/v1/projects/*",
+                                "/api/v1/projects/*/members/*",
+                                "/api/v1/projects/*/required-skills/*").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.GET, "/api/v1/projects/*/member-recommendations").hasRole("PROJECT_MANAGER")
                         .anyExchange().authenticated());
 
         return http.build();
