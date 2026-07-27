@@ -7,7 +7,9 @@ import com.skillteam.projectteam.entity.Project;
 import com.skillteam.projectteam.entity.ProjectStatus;
 import com.skillteam.projectteam.exception.ProjectAlreadyExistsException;
 import com.skillteam.projectteam.exception.ProjectNotFoundException;
+import com.skillteam.projectteam.repository.ProjectMemberRepository;
 import com.skillteam.projectteam.repository.ProjectRepository;
+import com.skillteam.projectteam.repository.ProjectRequiredSkillRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +25,15 @@ public class ProjectService {
     private static final String NOT_FOUND_MESSAGE = "No project exists for this id.";
 
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectRequiredSkillRepository projectRequiredSkillRepository;
 
-    public ProjectService(ProjectRepository projectRepository) {
+    public ProjectService(ProjectRepository projectRepository,
+                           ProjectMemberRepository projectMemberRepository,
+                           ProjectRequiredSkillRepository projectRequiredSkillRepository) {
         this.projectRepository = projectRepository;
+        this.projectMemberRepository = projectMemberRepository;
+        this.projectRequiredSkillRepository = projectRequiredSkillRepository;
     }
 
     @Transactional
@@ -90,6 +98,8 @@ public class ProjectService {
     @Transactional
     public void delete(Long id) {
         Project project = findOrThrow(id);
+        projectMemberRepository.deleteByProjectId(id);
+        projectRequiredSkillRepository.deleteByProjectId(id);
         projectRepository.delete(project);
     }
 

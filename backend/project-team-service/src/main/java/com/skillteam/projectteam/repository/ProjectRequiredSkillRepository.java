@@ -13,4 +13,6 @@ public interface ProjectRequiredSkillRepository extends JpaRepository<ProjectReq
     Optional<ProjectRequiredSkill> findByProjectIdAndSkillId(Long projectId, Long skillId);
 
     List<ProjectRequiredSkill> findByProjectIdOrderByIdAsc(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }

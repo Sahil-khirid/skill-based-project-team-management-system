@@ -13,4 +13,6 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
     Optional<ProjectMember> findByProjectIdAndAuthUserId(Long projectId, Long authUserId);
 
     List<ProjectMember> findByProjectIdOrderByIdAsc(Long projectId);
+
+    void deleteByProjectId(Long projectId);
 }
