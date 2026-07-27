@@ -108,9 +108,35 @@ below draw a clear line between what is implemented today and what is planned.
 - Password reset, email verification, and OAuth2/social login remain **not
   implemented**.
 
+### Implemented (Milestones 7A–7F — Project & Team Service and Member Recommendations)
+
+- Standalone Project & Team Service (`backend/project-team-service`),
+  application name `PROJECT-TEAM-SERVICE`, listening on port `8083`.
+- Registers with the Eureka Server as a discovery client.
+- Owns its own MySQL database, `skillteam_project`, with schema managed
+  exclusively through Flyway (`spring.jpa.hibernate.ddl-auto: validate`).
+- **Project CRUD** (`/api/v1/projects`) — create, list, fetch, update, and
+  delete projects, with unique project names and a PROJECT_MANAGER-only
+  write path.
+- **Project Member Management** (`/api/v1/projects/{projectId}/members`) —
+  add, list, and remove members by their Auth Service user id and project
+  role.
+- **Project Required Skills** (`/api/v1/projects/{projectId}/required-skills`)
+  — declare which skills, at which proficiency level, a project needs.
+- **User & Skill Service integration** — a Eureka load-balanced `RestClient`
+  (`UserSkillServiceClient`) forwards the caller's trusted identity headers
+  to the User & Skill Service's internal skill-lookup endpoint.
+- **Member Recommendation Engine**
+  (`GET /api/v1/projects/{projectId}/member-recommendations`) — ranks a
+  project's current members against its required skills, returning each
+  member's match percentage and matched/missing skill detail, in
+  deterministic order (highest match percentage first, ties broken by
+  matched-skill count, then by user id).
+- Routed through the API Gateway at `/api/v1/projects/**` — see "Gateway
+  routes" below.
+
 ### Planned (not yet implemented)
 
-- Project & Team Service
 - Task & Progress Service
 - React (Vite) frontend
 - CORS configuration and frontend integration at the API Gateway
@@ -124,9 +150,9 @@ Current implemented backend services are:
 - API Gateway
 - Auth Service
 - User & Skill Service
+- Project & Team Service
 
-Do not assume Project & Team Service or Task & Progress Service are
-functional yet.
+Do not assume Task & Progress Service is functional yet.
 
 ## Requirements
 
@@ -191,8 +217,9 @@ The Eureka Server does **not** require MySQL or any database connection.
 - Registers with Eureka at: `http://localhost:8761/eureka/` (override via the
   `EUREKA_DEFAULT_ZONE` environment variable — see `.env.example`).
 - Routes for the User & Skill Service (`/api/v1/users/**` and
-  `/api/v1/skills/**`) are implemented. Routes for the Project & Team and
-  Task & Progress services are not implemented yet.
+  `/api/v1/skills/**`) and the Project & Team Service (`/api/v1/projects/**`)
+  are implemented. Routes for the Task & Progress service are not
+  implemented yet.
 - CORS configuration is intentionally **excluded** from this milestone;
   frontend integration is deferred.
 
@@ -203,6 +230,7 @@ The Eureka Server does **not** require MySQL or any database connection.
 | `auth-service`        | `Path=/api/v1/auth/**`      | `lb://AUTH-SERVICE` (Eureka load-balanced)   |
 | `user-skill-users`    | `Path=/api/v1/users/**`     | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
 | `user-skill-skills`   | `Path=/api/v1/skills/**`    | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
+| `project-team-service`| `Path=/api/v1/projects/**` | `lb://PROJECT-TEAM-SERVICE` (Eureka load-balanced) |
 
 The Gateway does not rewrite the path — each route reaches its downstream
 service with the same path it was requested on.
