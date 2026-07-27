@@ -79,6 +79,12 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(UserSkillServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleUserSkillServiceUnavailable(
+            UserSkillServiceUnavailableException ex, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,
