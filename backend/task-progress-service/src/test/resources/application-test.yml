@@ -1,0 +1,30 @@
+# Test-only profile: runs the Task & Progress Service against an in-memory H2
+# database (MySQL compatibility mode) so Flyway applies without a running
+# MySQL instance, and disables Eureka so tests don't need a running Eureka
+# Server. Production/local configuration (application.yml under
+# src/main/resources) is untouched. Contains no real credentials.
+spring:
+  datasource:
+    url: jdbc:h2:mem:taskprogressdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

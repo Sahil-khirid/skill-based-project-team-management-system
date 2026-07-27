@@ -18,6 +18,7 @@
         <module>backend/auth-service</module>
         <module>backend/user-skill-service</module>
         <module>backend/project-team-service</module>
+        <module>backend/task-progress-service</module>
     </modules>
 
     <properties>
