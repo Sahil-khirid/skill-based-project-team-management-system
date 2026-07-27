@@ -15,7 +15,7 @@
     <packaging>jar</packaging>
 
     <name>User &amp; Skill Service</name>
-    <description>User and Skill Service foundation — Eureka-registered service; user profile and skill management are not yet implemented.</description>
+    <description>User and Skill Service for the Skill-Based Project Team Management System.</description>
 
     <dependencies>
         <dependency>
