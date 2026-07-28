@@ -49,6 +49,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), request, List.of());
     }
 
+    @ExceptionHandler(InvalidTaskStatusTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidTaskStatusTransition(InvalidTaskStatusTransitionException ex,
+                                                                             HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request, List.of());
+    }
+
+    @ExceptionHandler(InvalidTaskProgressException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidTaskProgress(InvalidTaskProgressException ex,
+                                                                     HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request, List.of());
+    }
+
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status,
                                                           String message,
                                                           HttpServletRequest request,

@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,6 +56,18 @@ class TaskControllerTest {
 
     private String quoteOrNull(String value) {
         return value == null ? "null" : "\"" + value + "\"";
+    }
+
+    private String assignBody(Long assignedAuthUserId) {
+        return "{\"assignedAuthUserId\":" + assignedAuthUserId + "}";
+    }
+
+    private String statusBody(String status) {
+        return "{\"status\":" + quoteOrNull(status) + "}";
+    }
+
+    private String progressBody(Integer progressPercentage) {
+        return "{\"progressPercentage\":" + progressPercentage + "}";
     }
 
     private MockHttpServletRequestBuilder asManager(MockHttpServletRequestBuilder builder) {
@@ -383,5 +396,249 @@ class TaskControllerTest {
 
         mockMvc.perform(asManager(delete(TASKS_URL + "/" + id)))
                 .andExpect(status().isNoContent());
+    }
+
+    // --- assignment ---
+
+    @Test
+    void assignExistingTaskReturnsUpdatedTask() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assignable task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedAuthUserId").value(5));
+    }
+
+    @Test
+    void assignMissingTaskReturnsNotFound() throws Exception {
+        mockMvc.perform(asManager(patch(TASKS_URL + "/999999/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void assignWithoutAssignedAuthUserIdReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assignable task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void userRoleCannotAssignTask() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Protected task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- status transitions ---
+
+    @Test
+    void updateStatusWithValidTransitionReturnsOk() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void updateStatusToCompletedSetsProgressToOneHundred() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Completable task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("COMPLETED")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.progressPercentage").value(100));
+    }
+
+    @Test
+    void updateStatusFromCompletedToTodoReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Locked task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("COMPLETED")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("TODO")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateStatusMissingTaskReturnsNotFound() throws Exception {
+        mockMvc.perform(asManager(patch(TASKS_URL + "/999999/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void updateStatusWithInvalidStatusValueReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Bad status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void userRoleCannotUpdateTaskStatus() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Protected status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- progress updates ---
+
+    @Test
+    void updateProgressWhenInProgressReturnsOk() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progressPercentage").value(45));
+    }
+
+    @Test
+    void updateProgressWhenTodoReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Todo progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateProgressWhenCompletedReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Completed progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("COMPLETED")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateProgressAboveMaximumReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Over-progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(101)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateProgressBelowMinimumReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Under-progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(-1)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateProgressMissingTaskReturnsNotFound() throws Exception {
+        mockMvc.perform(asManager(patch(TASKS_URL + "/999999/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void userRoleCannotUpdateTaskProgress() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Protected progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isForbidden());
     }
 }

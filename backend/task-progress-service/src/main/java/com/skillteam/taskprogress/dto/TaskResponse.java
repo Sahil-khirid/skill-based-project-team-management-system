@@ -14,6 +14,8 @@ public record TaskResponse(
         TaskStatus status,
         TaskPriority priority,
         LocalDate dueDate,
+        Long assignedAuthUserId,
+        Integer progressPercentage,
         Instant createdAt,
         Instant updatedAt
 ) {
