@@ -1,5 +1,8 @@
 package com.skillteam.taskprogress;
 
+import com.skillteam.taskprogress.client.ProjectTeamServiceClient;
+import com.skillteam.taskprogress.client.RemoteProjectMemberResponse;
+import com.skillteam.taskprogress.exception.ProjectTeamServiceUnavailableException;
 import com.skillteam.taskprogress.repository.TaskRepository;
 import com.skillteam.taskprogress.security.IdentityHeaderResolver;
 import org.junit.jupiter.api.AfterEach;
@@ -9,9 +12,16 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.time.Instant;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -37,9 +47,16 @@ class TaskControllerTest {
     @Autowired
     private TaskRepository taskRepository;
 
+    @MockitoBean
+    private ProjectTeamServiceClient projectTeamServiceClient;
+
     @AfterEach
     void cleanUp() {
         taskRepository.deleteAll();
+    }
+
+    private RemoteProjectMemberResponse remoteMember(Long projectId, Long authUserId) {
+        return new RemoteProjectMemberResponse(authUserId, projectId, authUserId, "MEMBER", Instant.now(), Instant.now());
     }
 
     private String createBody(Long projectId, String title, String description, String priority, String dueDate) {
@@ -401,12 +418,15 @@ class TaskControllerTest {
     // --- assignment ---
 
     @Test
-    void assignExistingTaskReturnsUpdatedTask() throws Exception {
+    void assignExistingTaskToAProjectMemberReturnsUpdatedTask() throws Exception {
         String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
                         .content(createBody(1L, "Assignable task", null, "LOW", null)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 5L)));
 
         mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
                         .content(assignBody(5L)))
@@ -432,6 +452,40 @@ class TaskControllerTest {
         mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void assignToUserWhoIsNotAProjectMemberReturnsBadRequest() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assignable task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 20L)));
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void assignWhenProjectTeamServiceIsUnavailableReturnsServiceUnavailable() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assignable task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenThrow(new ProjectTeamServiceUnavailableException("downstream unavailable", new RuntimeException()));
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503));
     }
 
     @Test
