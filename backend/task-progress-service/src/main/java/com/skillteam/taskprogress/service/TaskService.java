@@ -4,6 +4,7 @@ import com.skillteam.taskprogress.client.ProjectTeamServiceClient;
 import com.skillteam.taskprogress.client.RemoteProjectMemberResponse;
 import com.skillteam.taskprogress.dto.AssignTaskRequest;
 import com.skillteam.taskprogress.dto.CreateTaskRequest;
+import com.skillteam.taskprogress.dto.TaskProgressSummaryResponse;
 import com.skillteam.taskprogress.dto.TaskResponse;
 import com.skillteam.taskprogress.dto.UpdateTaskProgressRequest;
 import com.skillteam.taskprogress.dto.UpdateTaskRequest;
@@ -65,6 +66,20 @@ public class TaskService {
     public TaskResponse get(Long id) {
         Task task = findOrThrow(id);
         return toResponse(task);
+    }
+
+    @Transactional(readOnly = true)
+    public TaskProgressSummaryResponse getProgressSummary(Long projectId) {
+        long total = taskRepository.countByProjectId(projectId);
+        long todo = taskRepository.countByProjectIdAndStatus(projectId, TaskStatus.TODO);
+        long inProgress = taskRepository.countByProjectIdAndStatus(projectId, TaskStatus.IN_PROGRESS);
+        long completed = taskRepository.countByProjectIdAndStatus(projectId, TaskStatus.COMPLETED);
+        long blocked = taskRepository.countByProjectIdAndStatus(projectId, TaskStatus.BLOCKED);
+
+        double completionPercentage = total == 0 ? 0.0 : roundToTwoDecimals(completed * 100.0 / total);
+
+        return new TaskProgressSummaryResponse(projectId, total, todo, inProgress, completed, blocked,
+                completionPercentage);
     }
 
     @Transactional
@@ -146,6 +161,10 @@ public class TaskService {
     private Task findOrThrow(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new TaskNotFoundException(NOT_FOUND_MESSAGE));
+    }
+
+    private double roundToTwoDecimals(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     private TaskResponse toResponse(Task task) {

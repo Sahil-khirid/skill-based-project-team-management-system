@@ -4,6 +4,7 @@ import com.skillteam.taskprogress.client.ProjectTeamServiceClient;
 import com.skillteam.taskprogress.client.RemoteProjectMemberResponse;
 import com.skillteam.taskprogress.dto.AssignTaskRequest;
 import com.skillteam.taskprogress.dto.CreateTaskRequest;
+import com.skillteam.taskprogress.dto.TaskProgressSummaryResponse;
 import com.skillteam.taskprogress.dto.TaskResponse;
 import com.skillteam.taskprogress.dto.UpdateTaskProgressRequest;
 import com.skillteam.taskprogress.dto.UpdateTaskRequest;
@@ -311,5 +312,70 @@ class TaskServiceTest {
         assertThatThrownBy(() -> taskService.updateProgress(999L, new UpdateTaskProgressRequest(50)))
                 .isInstanceOf(TaskNotFoundException.class)
                 .hasMessage("No task exists for this id.");
+    }
+
+    // --- progress summary ---
+
+    @Test
+    void progressSummaryForProjectWithNoTasksReturnsAllZeroesWithoutDivisionByZero() {
+        when(taskRepository.countByProjectId(1L)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.TODO)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.IN_PROGRESS)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.COMPLETED)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.BLOCKED)).thenReturn(0L);
+
+        TaskProgressSummaryResponse summary = taskService.getProgressSummary(1L);
+
+        assertThat(summary.projectId()).isEqualTo(1L);
+        assertThat(summary.totalTasks()).isZero();
+        assertThat(summary.todoCount()).isZero();
+        assertThat(summary.inProgressCount()).isZero();
+        assertThat(summary.completedCount()).isZero();
+        assertThat(summary.blockedCount()).isZero();
+        assertThat(summary.completionPercentage()).isEqualTo(0.0);
+    }
+
+    @Test
+    void progressSummaryForProjectWithMixedStatusesComputesCorrectCounts() {
+        when(taskRepository.countByProjectId(1L)).thenReturn(10L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.TODO)).thenReturn(3L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.IN_PROGRESS)).thenReturn(2L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.COMPLETED)).thenReturn(4L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.BLOCKED)).thenReturn(1L);
+
+        TaskProgressSummaryResponse summary = taskService.getProgressSummary(1L);
+
+        assertThat(summary.totalTasks()).isEqualTo(10L);
+        assertThat(summary.todoCount()).isEqualTo(3L);
+        assertThat(summary.inProgressCount()).isEqualTo(2L);
+        assertThat(summary.completedCount()).isEqualTo(4L);
+        assertThat(summary.blockedCount()).isEqualTo(1L);
+        assertThat(summary.completionPercentage()).isEqualTo(40.0);
+    }
+
+    @Test
+    void progressSummaryRoundsCompletionPercentageToTwoDecimals() {
+        when(taskRepository.countByProjectId(1L)).thenReturn(3L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.TODO)).thenReturn(2L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.IN_PROGRESS)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.COMPLETED)).thenReturn(1L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.BLOCKED)).thenReturn(0L);
+
+        TaskProgressSummaryResponse summary = taskService.getProgressSummary(1L);
+
+        assertThat(summary.completionPercentage()).isEqualTo(33.33);
+    }
+
+    @Test
+    void progressSummaryForFullyCompletedProjectReturnsOneHundredPercent() {
+        when(taskRepository.countByProjectId(1L)).thenReturn(5L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.TODO)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.IN_PROGRESS)).thenReturn(0L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.COMPLETED)).thenReturn(5L);
+        when(taskRepository.countByProjectIdAndStatus(1L, TaskStatus.BLOCKED)).thenReturn(0L);
+
+        TaskProgressSummaryResponse summary = taskService.getProgressSummary(1L);
+
+        assertThat(summary.completionPercentage()).isEqualTo(100.0);
     }
 }
