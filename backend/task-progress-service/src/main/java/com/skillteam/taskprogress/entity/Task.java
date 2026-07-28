@@ -42,6 +42,12 @@ public class Task {
     @Column(name = "due_date")
     private LocalDate dueDate;
 
+    @Column(name = "assigned_auth_user_id")
+    private Long assignedAuthUserId;
+
+    @Column(name = "progress_percentage", nullable = false)
+    private Integer progressPercentage = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -119,6 +125,22 @@ public class Task {
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public Long getAssignedAuthUserId() {
+        return assignedAuthUserId;
+    }
+
+    public void setAssignedAuthUserId(Long assignedAuthUserId) {
+        this.assignedAuthUserId = assignedAuthUserId;
+    }
+
+    public Integer getProgressPercentage() {
+        return progressPercentage;
+    }
+
+    public void setProgressPercentage(Integer progressPercentage) {
+        this.progressPercentage = progressPercentage;
     }
 
     public Instant getCreatedAt() {

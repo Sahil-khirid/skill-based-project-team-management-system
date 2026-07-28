@@ -1,21 +1,35 @@
 package com.skillteam.taskprogress.service;
 
+import com.skillteam.taskprogress.dto.AssignTaskRequest;
 import com.skillteam.taskprogress.dto.CreateTaskRequest;
 import com.skillteam.taskprogress.dto.TaskResponse;
+import com.skillteam.taskprogress.dto.UpdateTaskProgressRequest;
 import com.skillteam.taskprogress.dto.UpdateTaskRequest;
+import com.skillteam.taskprogress.dto.UpdateTaskStatusRequest;
 import com.skillteam.taskprogress.entity.Task;
 import com.skillteam.taskprogress.entity.TaskStatus;
+import com.skillteam.taskprogress.exception.InvalidTaskProgressException;
+import com.skillteam.taskprogress.exception.InvalidTaskStatusTransitionException;
 import com.skillteam.taskprogress.exception.TaskNotFoundException;
 import com.skillteam.taskprogress.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class TaskService {
 
     private static final String NOT_FOUND_MESSAGE = "No task exists for this id.";
+
+    private static final Map<TaskStatus, Set<TaskStatus>> ALLOWED_STATUS_TRANSITIONS = Map.of(
+            TaskStatus.TODO, Set.of(TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED, TaskStatus.BLOCKED),
+            TaskStatus.IN_PROGRESS, Set.of(TaskStatus.COMPLETED, TaskStatus.BLOCKED),
+            TaskStatus.BLOCKED, Set.of(TaskStatus.IN_PROGRESS),
+            TaskStatus.COMPLETED, Set.of()
+    );
 
     private final TaskRepository taskRepository;
 
@@ -65,6 +79,53 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
+    @Transactional
+    public TaskResponse assign(Long id, AssignTaskRequest request) {
+        Task task = findOrThrow(id);
+        task.setAssignedAuthUserId(request.assignedAuthUserId());
+
+        Task saved = taskRepository.saveAndFlush(task);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public TaskResponse updateStatus(Long id, UpdateTaskStatusRequest request) {
+        Task task = findOrThrow(id);
+        TaskStatus current = task.getStatus();
+        TaskStatus target = request.status();
+
+        if (!ALLOWED_STATUS_TRANSITIONS.getOrDefault(current, Set.of()).contains(target)) {
+            throw new InvalidTaskStatusTransitionException(
+                    "Cannot transition task status from " + current + " to " + target + ".");
+        }
+
+        task.setStatus(target);
+        if (target == TaskStatus.COMPLETED) {
+            task.setProgressPercentage(100);
+        }
+
+        Task saved = taskRepository.saveAndFlush(task);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public TaskResponse updateProgress(Long id, UpdateTaskProgressRequest request) {
+        Task task = findOrThrow(id);
+        TaskStatus status = task.getStatus();
+
+        if (status == TaskStatus.TODO) {
+            throw new InvalidTaskProgressException("Cannot update progress while task status is TODO.");
+        }
+        if (status == TaskStatus.COMPLETED) {
+            throw new InvalidTaskProgressException("Cannot update progress while task status is COMPLETED.");
+        }
+
+        task.setProgressPercentage(request.progressPercentage());
+
+        Task saved = taskRepository.saveAndFlush(task);
+        return toResponse(saved);
+    }
+
     private Task findOrThrow(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new TaskNotFoundException(NOT_FOUND_MESSAGE));
@@ -79,6 +140,8 @@ public class TaskService {
                 task.getStatus(),
                 task.getPriority(),
                 task.getDueDate(),
+                task.getAssignedAuthUserId(),
+                task.getProgressPercentage(),
                 task.getCreatedAt(),
                 task.getUpdatedAt()
         );
