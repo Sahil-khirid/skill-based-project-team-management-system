@@ -86,11 +86,11 @@ public class TaskController {
     @PatchMapping("/{id}/assign")
     public ResponseEntity<TaskResponse> assign(HttpServletRequest httpRequest, @PathVariable Long id,
                                                 @Valid @RequestBody AssignTaskRequest request) {
-        identityHeaderResolver.resolve(httpRequest);
+        Long callerUserId = identityHeaderResolver.resolve(httpRequest);
         String role = identityHeaderResolver.resolveRole(httpRequest);
         identityHeaderResolver.requireProjectManager(role);
 
-        return ResponseEntity.ok(taskService.assign(id, request));
+        return ResponseEntity.ok(taskService.assign(id, request, callerUserId, role));
     }
 
     @PatchMapping("/{id}/status")

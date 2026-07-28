@@ -1,5 +1,7 @@
 package com.skillteam.taskprogress.service;
 
+import com.skillteam.taskprogress.client.ProjectTeamServiceClient;
+import com.skillteam.taskprogress.client.RemoteProjectMemberResponse;
 import com.skillteam.taskprogress.dto.AssignTaskRequest;
 import com.skillteam.taskprogress.dto.CreateTaskRequest;
 import com.skillteam.taskprogress.dto.TaskResponse;
@@ -8,6 +10,7 @@ import com.skillteam.taskprogress.dto.UpdateTaskRequest;
 import com.skillteam.taskprogress.dto.UpdateTaskStatusRequest;
 import com.skillteam.taskprogress.entity.Task;
 import com.skillteam.taskprogress.entity.TaskStatus;
+import com.skillteam.taskprogress.exception.InvalidTaskAssignmentException;
 import com.skillteam.taskprogress.exception.InvalidTaskProgressException;
 import com.skillteam.taskprogress.exception.InvalidTaskStatusTransitionException;
 import com.skillteam.taskprogress.exception.TaskNotFoundException;
@@ -31,10 +34,15 @@ public class TaskService {
             TaskStatus.COMPLETED, Set.of()
     );
 
-    private final TaskRepository taskRepository;
+    private static final String NOT_PROJECT_MEMBER_MESSAGE =
+            "Cannot assign this task: the user is not a member of this task's project.";
 
-    public TaskService(TaskRepository taskRepository) {
+    private final TaskRepository taskRepository;
+    private final ProjectTeamServiceClient projectTeamServiceClient;
+
+    public TaskService(TaskRepository taskRepository, ProjectTeamServiceClient projectTeamServiceClient) {
         this.taskRepository = taskRepository;
+        this.projectTeamServiceClient = projectTeamServiceClient;
     }
 
     @Transactional
@@ -80,8 +88,17 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse assign(Long id, AssignTaskRequest request) {
+    public TaskResponse assign(Long id, AssignTaskRequest request, Long callerUserId, String callerRole) {
         Task task = findOrThrow(id);
+
+        List<RemoteProjectMemberResponse> members =
+                projectTeamServiceClient.fetchMembers(task.getProjectId(), callerUserId, callerRole);
+        boolean isMember = members.stream()
+                .anyMatch(member -> member.authUserId().equals(request.assignedAuthUserId()));
+        if (!isMember) {
+            throw new InvalidTaskAssignmentException(NOT_PROJECT_MEMBER_MESSAGE);
+        }
+
         task.setAssignedAuthUserId(request.assignedAuthUserId());
 
         Task saved = taskRepository.saveAndFlush(task);
