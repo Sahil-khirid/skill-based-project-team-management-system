@@ -12,6 +12,7 @@ import com.skillteam.taskprogress.dto.UpdateTaskStatusRequest;
 import com.skillteam.taskprogress.entity.Task;
 import com.skillteam.taskprogress.entity.TaskPriority;
 import com.skillteam.taskprogress.entity.TaskStatus;
+import com.skillteam.taskprogress.exception.ForbiddenException;
 import com.skillteam.taskprogress.exception.InvalidTaskAssignmentException;
 import com.skillteam.taskprogress.exception.InvalidTaskProgressException;
 import com.skillteam.taskprogress.exception.InvalidTaskStatusTransitionException;
@@ -40,6 +41,9 @@ class TaskServiceTest {
 
     private static final Long CALLER_USER_ID = 1L;
     private static final String CALLER_ROLE = "PROJECT_MANAGER";
+    private static final String USER_ROLE = "USER";
+    private static final Long ASSIGNEE_USER_ID = 42L;
+    private static final Long OTHER_USER_ID = 99L;
 
     @Mock
     private TaskRepository taskRepository;
@@ -190,7 +194,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS));
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.status()).isEqualTo(TaskStatus.IN_PROGRESS);
     }
@@ -202,7 +207,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.COMPLETED));
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.COMPLETED),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.status()).isEqualTo(TaskStatus.COMPLETED);
         assertThat(response.progressPercentage()).isEqualTo(100);
@@ -213,11 +219,14 @@ class TaskServiceTest {
         Task task = new Task(1L, "Apollo", null, TaskStatus.COMPLETED, TaskPriority.LOW, null);
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
 
-        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.TODO)))
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.TODO),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskStatusTransitionException.class);
-        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS)))
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskStatusTransitionException.class);
-        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.BLOCKED)))
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.BLOCKED),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskStatusTransitionException.class);
     }
 
@@ -227,7 +236,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.BLOCKED));
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.BLOCKED),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.status()).isEqualTo(TaskStatus.BLOCKED);
     }
@@ -238,7 +248,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS));
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.status()).isEqualTo(TaskStatus.IN_PROGRESS);
     }
@@ -248,7 +259,8 @@ class TaskServiceTest {
         Task task = new Task(1L, "Apollo", null, TaskStatus.BLOCKED, TaskPriority.LOW, null);
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
 
-        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.COMPLETED)))
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.COMPLETED),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskStatusTransitionException.class);
     }
 
@@ -256,9 +268,110 @@ class TaskServiceTest {
     void updateStatusMissingTaskIsTranslatedToTaskNotFoundException() {
         when(taskRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> taskService.updateStatus(999L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS)))
+        assertThatThrownBy(() -> taskService.updateStatus(999L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(TaskNotFoundException.class)
                 .hasMessage("No task exists for this id.");
+    }
+
+    // --- status/progress authorization: PROJECT_MANAGER, assignee, others ---
+
+    @Test
+    void projectManagerCanUpdateStatusOnAnyTask() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.TODO, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+        when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                CALLER_USER_ID, CALLER_ROLE);
+
+        assertThat(response.status()).isEqualTo(TaskStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void projectManagerCanUpdateProgressOnAnyTask() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.IN_PROGRESS, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+        when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(60),
+                CALLER_USER_ID, CALLER_ROLE);
+
+        assertThat(response.progressPercentage()).isEqualTo(60);
+    }
+
+    @Test
+    void assignedUserCanUpdateOwnTaskStatus() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.TODO, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+        when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskResponse response = taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                ASSIGNEE_USER_ID, USER_ROLE);
+
+        assertThat(response.status()).isEqualTo(TaskStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void assignedUserCanUpdateOwnTaskProgress() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.IN_PROGRESS, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+        when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(70),
+                ASSIGNEE_USER_ID, USER_ROLE);
+
+        assertThat(response.progressPercentage()).isEqualTo(70);
+    }
+
+    @Test
+    void nonAssignedUserCannotUpdateTaskStatus() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.TODO, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                OTHER_USER_ID, USER_ROLE))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Access is denied.");
+    }
+
+    @Test
+    void nonAssignedUserCannotUpdateTaskProgress() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.IN_PROGRESS, TaskPriority.LOW, null);
+        task.setAssignedAuthUserId(ASSIGNEE_USER_ID);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50),
+                OTHER_USER_ID, USER_ROLE))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Access is denied.");
+    }
+
+    @Test
+    void userCannotUpdateStatusOnUnassignedTask() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.TODO, TaskPriority.LOW, null);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.updateStatus(5L, new UpdateTaskStatusRequest(TaskStatus.IN_PROGRESS),
+                OTHER_USER_ID, USER_ROLE))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Access is denied.");
+    }
+
+    @Test
+    void userCannotUpdateProgressOnUnassignedTask() {
+        Task task = new Task(1L, "Apollo", null, TaskStatus.IN_PROGRESS, TaskPriority.LOW, null);
+        when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
+
+        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50),
+                OTHER_USER_ID, USER_ROLE))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Access is denied.");
     }
 
     // --- progress updates ---
@@ -269,7 +382,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(45));
+        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(45),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.progressPercentage()).isEqualTo(45);
     }
@@ -281,7 +395,8 @@ class TaskServiceTest {
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
         when(taskRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(30));
+        TaskResponse response = taskService.updateProgress(5L, new UpdateTaskProgressRequest(30),
+                CALLER_USER_ID, CALLER_ROLE);
 
         assertThat(response.progressPercentage()).isEqualTo(30);
     }
@@ -291,7 +406,8 @@ class TaskServiceTest {
         Task task = new Task(1L, "Apollo", null, TaskStatus.TODO, TaskPriority.LOW, null);
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
 
-        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50)))
+        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskProgressException.class);
     }
 
@@ -301,7 +417,8 @@ class TaskServiceTest {
         task.setProgressPercentage(100);
         when(taskRepository.findById(5L)).thenReturn(Optional.of(task));
 
-        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50)))
+        assertThatThrownBy(() -> taskService.updateProgress(5L, new UpdateTaskProgressRequest(50),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(InvalidTaskProgressException.class);
     }
 
@@ -309,7 +426,8 @@ class TaskServiceTest {
     void updateProgressMissingTaskIsTranslatedToTaskNotFoundException() {
         when(taskRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> taskService.updateProgress(999L, new UpdateTaskProgressRequest(50)))
+        assertThatThrownBy(() -> taskService.updateProgress(999L, new UpdateTaskProgressRequest(50),
+                CALLER_USER_ID, CALLER_ROLE))
                 .isInstanceOf(TaskNotFoundException.class)
                 .hasMessage("No task exists for this id.");
     }

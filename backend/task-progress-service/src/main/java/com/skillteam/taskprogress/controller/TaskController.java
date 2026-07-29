@@ -96,20 +96,18 @@ public class TaskController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<TaskResponse> updateStatus(HttpServletRequest httpRequest, @PathVariable Long id,
                                                       @Valid @RequestBody UpdateTaskStatusRequest request) {
-        identityHeaderResolver.resolve(httpRequest);
-        String role = identityHeaderResolver.resolveRole(httpRequest);
-        identityHeaderResolver.requireProjectManager(role);
+        Long callerUserId = identityHeaderResolver.resolve(httpRequest);
+        String callerRole = identityHeaderResolver.resolveRole(httpRequest);
 
-        return ResponseEntity.ok(taskService.updateStatus(id, request));
+        return ResponseEntity.ok(taskService.updateStatus(id, request, callerUserId, callerRole));
     }
 
     @PatchMapping("/{id}/progress")
     public ResponseEntity<TaskResponse> updateProgress(HttpServletRequest httpRequest, @PathVariable Long id,
                                                         @Valid @RequestBody UpdateTaskProgressRequest request) {
-        identityHeaderResolver.resolve(httpRequest);
-        String role = identityHeaderResolver.resolveRole(httpRequest);
-        identityHeaderResolver.requireProjectManager(role);
+        Long callerUserId = identityHeaderResolver.resolve(httpRequest);
+        String callerRole = identityHeaderResolver.resolveRole(httpRequest);
 
-        return ResponseEntity.ok(taskService.updateProgress(id, request));
+        return ResponseEntity.ok(taskService.updateProgress(id, request, callerUserId, callerRole));
     }
 }

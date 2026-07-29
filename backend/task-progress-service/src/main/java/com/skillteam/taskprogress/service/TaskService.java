@@ -11,6 +11,7 @@ import com.skillteam.taskprogress.dto.UpdateTaskRequest;
 import com.skillteam.taskprogress.dto.UpdateTaskStatusRequest;
 import com.skillteam.taskprogress.entity.Task;
 import com.skillteam.taskprogress.entity.TaskStatus;
+import com.skillteam.taskprogress.exception.ForbiddenException;
 import com.skillteam.taskprogress.exception.InvalidTaskAssignmentException;
 import com.skillteam.taskprogress.exception.InvalidTaskProgressException;
 import com.skillteam.taskprogress.exception.InvalidTaskStatusTransitionException;
@@ -37,6 +38,10 @@ public class TaskService {
 
     private static final String NOT_PROJECT_MEMBER_MESSAGE =
             "Cannot assign this task: the user is not a member of this task's project.";
+
+    private static final String ROLE_PROJECT_MANAGER = "PROJECT_MANAGER";
+    private static final String ROLE_USER = "USER";
+    private static final String FORBIDDEN_MESSAGE = "Access is denied.";
 
     private final TaskRepository taskRepository;
     private final ProjectTeamServiceClient projectTeamServiceClient;
@@ -121,8 +126,10 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse updateStatus(Long id, UpdateTaskStatusRequest request) {
+    public TaskResponse updateStatus(Long id, UpdateTaskStatusRequest request, Long callerUserId, String callerRole) {
         Task task = findOrThrow(id);
+        requireManagerOrAssignee(task, callerUserId, callerRole);
+
         TaskStatus current = task.getStatus();
         TaskStatus target = request.status();
 
@@ -141,8 +148,10 @@ public class TaskService {
     }
 
     @Transactional
-    public TaskResponse updateProgress(Long id, UpdateTaskProgressRequest request) {
+    public TaskResponse updateProgress(Long id, UpdateTaskProgressRequest request, Long callerUserId, String callerRole) {
         Task task = findOrThrow(id);
+        requireManagerOrAssignee(task, callerUserId, callerRole);
+
         TaskStatus status = task.getStatus();
 
         if (status == TaskStatus.TODO) {
@@ -161,6 +170,20 @@ public class TaskService {
     private Task findOrThrow(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new TaskNotFoundException(NOT_FOUND_MESSAGE));
+    }
+
+    private void requireManagerOrAssignee(Task task, Long callerUserId, String callerRole) {
+        if (ROLE_PROJECT_MANAGER.equals(callerRole)) {
+            return;
+        }
+
+        if (ROLE_USER.equals(callerRole)
+                && task.getAssignedAuthUserId() != null
+                && task.getAssignedAuthUserId().equals(callerUserId)) {
+            return;
+        }
+
+        throw new ForbiddenException(FORBIDDEN_MESSAGE);
     }
 
     private double roundToTwoDecimals(double value) {
