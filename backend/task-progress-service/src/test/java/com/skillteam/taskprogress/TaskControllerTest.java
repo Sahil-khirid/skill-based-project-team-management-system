@@ -95,6 +95,10 @@ class TaskControllerTest {
         return builder.header(ID_HEADER, "2").header(ROLE_HEADER, USER);
     }
 
+    private MockHttpServletRequestBuilder asUser(MockHttpServletRequestBuilder builder, long authUserId) {
+        return builder.header(ID_HEADER, String.valueOf(authUserId)).header(ROLE_HEADER, USER);
+    }
+
     // --- create success ---
 
     @Test
@@ -587,6 +591,60 @@ class TaskControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void assignedUserCanUpdateOwnTaskStatus() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assigned status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 5L)));
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/status"), 5L).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void nonAssignedUserCannotUpdateTaskStatus() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assigned to someone else status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 5L)));
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/status"), 6L).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+    }
+
+    @Test
+    void userCannotUpdateStatusOnUnassignedTask() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Unassigned status task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+    }
+
     // --- progress updates ---
 
     @Test
@@ -694,5 +752,71 @@ class TaskControllerTest {
         mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
                         .content(progressBody(45)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void assignedUserCanUpdateOwnTaskProgress() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assigned progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 5L)));
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/progress"), 5L).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progressPercentage").value(45));
+    }
+
+    @Test
+    void nonAssignedUserCannotUpdateTaskProgress() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Assigned to someone else progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        when(projectTeamServiceClient.fetchMembers(eq(1L), any(), any()))
+                .thenReturn(List.of(remoteMember(1L, 5L)));
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/assign")).contentType(MediaType.APPLICATION_JSON)
+                        .content(assignBody(5L)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/progress"), 6L).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access is denied."));
+    }
+
+    @Test
+    void userCannotUpdateProgressOnUnassignedTask() throws Exception {
+        String response = mockMvc.perform(asManager(post(TASKS_URL)).contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody(1L, "Unassigned progress task", null, "LOW", null)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.valueOf(com.jayway.jsonpath.JsonPath.read(response, "$.id").toString());
+
+        mockMvc.perform(asManager(patch(TASKS_URL + "/" + id + "/status")).contentType(MediaType.APPLICATION_JSON)
+                        .content(statusBody("IN_PROGRESS")))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(asUser(patch(TASKS_URL + "/" + id + "/progress")).contentType(MediaType.APPLICATION_JSON)
+                        .content(progressBody(45)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Access is denied."));
     }
 }
