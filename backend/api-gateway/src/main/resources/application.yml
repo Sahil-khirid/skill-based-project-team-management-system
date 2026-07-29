@@ -21,10 +21,21 @@ spring:
               uri: lb://USER-SKILL-SERVICE
               predicates:
                 - Path=/api/v1/skills/**
+            - id: task-progress-summary
+              uri: lb://TASK-PROGRESS-SERVICE
+              predicates:
+                # Must precede project-team-service below: this specific route is a strict
+                # subset of that broader /api/v1/projects/** predicate, and Spring Cloud
+                # Gateway dispatches on the first matching route in declared list order.
+                - Path=/api/v1/projects/*/task-progress-summary
             - id: project-team-service
               uri: lb://PROJECT-TEAM-SERVICE
               predicates:
                 - Path=/api/v1/projects/**
+            - id: task-progress-tasks
+              uri: lb://TASK-PROGRESS-SERVICE
+              predicates:
+                - Path=/api/v1/tasks/**
           discovery:
             locator:
               # Only the explicit route above is exposed; automatic discovery

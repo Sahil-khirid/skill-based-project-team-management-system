@@ -135,9 +135,33 @@ below draw a clear line between what is implemented today and what is planned.
 - Routed through the API Gateway at `/api/v1/projects/**` — see "Gateway
   routes" below.
 
+### Implemented (Milestones T1–T6 — Task & Progress Service and Gateway Integration)
+
+- Standalone Task & Progress Service (`backend/task-progress-service`), application
+  name `TASK-PROGRESS-SERVICE`, listening on port `8084`.
+- Registers with the Eureka Server as a discovery client.
+- Owns its own MySQL database, `skillteam_task`, with schema managed exclusively
+  through Flyway (`spring.jpa.hibernate.ddl-auto: validate`).
+- **Task CRUD** (`/api/v1/tasks`) — create, list, fetch, update, and delete tasks,
+  with a PROJECT_MANAGER-only write path for create/update/delete.
+- **Task assignment** (`PATCH /api/v1/tasks/{id}/assign`, PROJECT_MANAGER-only) —
+  assigns a task to a project member, validated against the Project & Team
+  Service's member list.
+- **Task status and progress updates** (`PATCH /api/v1/tasks/{id}/status`,
+  `PATCH /api/v1/tasks/{id}/progress`) — reachable by both PROJECT_MANAGER and the
+  assigned USER; the service itself enforces that a non-manager caller must be the
+  task's current assignee.
+- **Project task progress summary**
+  (`GET /api/v1/projects/{projectId}/task-progress-summary`) — aggregate
+  todo/in-progress/completed/blocked counts and completion percentage for a
+  project, readable by both roles.
+- Does not parse JWTs — trusts the Gateway-produced `X-Auth-User-Id` /
+  `X-Auth-User-Role` headers for identity and coarse role information.
+- Routed through the API Gateway at `/api/v1/tasks/**` and
+  `/api/v1/projects/*/task-progress-summary` — see "Gateway routes" below.
+
 ### Planned (not yet implemented)
 
-- Task & Progress Service
 - React (Vite) frontend
 - CORS configuration and frontend integration at the API Gateway
 
@@ -151,8 +175,7 @@ Current implemented backend services are:
 - Auth Service
 - User & Skill Service
 - Project & Team Service
-
-Do not assume Task & Progress Service is functional yet.
+- Task & Progress Service
 
 ## Requirements
 
@@ -217,23 +240,31 @@ The Eureka Server does **not** require MySQL or any database connection.
 - Registers with Eureka at: `http://localhost:8761/eureka/` (override via the
   `EUREKA_DEFAULT_ZONE` environment variable — see `.env.example`).
 - Routes for the User & Skill Service (`/api/v1/users/**` and
-  `/api/v1/skills/**`) and the Project & Team Service (`/api/v1/projects/**`)
-  are implemented. Routes for the Task & Progress service are not
-  implemented yet.
+  `/api/v1/skills/**`), the Project & Team Service (`/api/v1/projects/**`),
+  and the Task & Progress Service (`/api/v1/tasks/**` and
+  `/api/v1/projects/*/task-progress-summary`) are implemented.
 - CORS configuration is intentionally **excluded** from this milestone;
   frontend integration is deferred.
 
 ### Gateway routes
 
-| Route id             | Predicate                  | Destination                                |
-|-----------------------|------------------------------|----------------------------------------------|
-| `auth-service`        | `Path=/api/v1/auth/**`      | `lb://AUTH-SERVICE` (Eureka load-balanced)   |
-| `user-skill-users`    | `Path=/api/v1/users/**`     | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
-| `user-skill-skills`   | `Path=/api/v1/skills/**`    | `lb://USER-SKILL-SERVICE` (Eureka load-balanced) |
-| `project-team-service`| `Path=/api/v1/projects/**` | `lb://PROJECT-TEAM-SERVICE` (Eureka load-balanced) |
+| Route id                | Predicate                                          | Destination                                        |
+|--------------------------|------------------------------------------------------|-------------------------------------------------------|
+| `task-progress-summary` | `Path=/api/v1/projects/*/task-progress-summary`    | `lb://TASK-PROGRESS-SERVICE` (Eureka load-balanced) |
+| `auth-service`           | `Path=/api/v1/auth/**`                              | `lb://AUTH-SERVICE` (Eureka load-balanced)          |
+| `user-skill-users`      | `Path=/api/v1/users/**`                             | `lb://USER-SKILL-SERVICE` (Eureka load-balanced)    |
+| `user-skill-skills`     | `Path=/api/v1/skills/**`                            | `lb://USER-SKILL-SERVICE` (Eureka load-balanced)    |
+| `project-team-service`  | `Path=/api/v1/projects/**`                          | `lb://PROJECT-TEAM-SERVICE` (Eureka load-balanced)  |
+| `task-progress-tasks`   | `Path=/api/v1/tasks/**`                             | `lb://TASK-PROGRESS-SERVICE` (Eureka load-balanced) |
 
 The Gateway does not rewrite the path — each route reaches its downstream
 service with the same path it was requested on.
+
+`task-progress-summary` is declared before `project-team-service` in
+`application.yml`: Spring Cloud Gateway matches routes in declared list
+order, and `/api/v1/projects/*/task-progress-summary` is a strict subset of
+the broader `/api/v1/projects/**` predicate, so the specific route would
+never be reached if it were placed after the broad one.
 
 ### Public vs. protected routes
 
@@ -251,6 +282,30 @@ Requests to a protected route with a missing, malformed, expired,
 invalid-signature, wrong-issuer, or wrong-audience token — or a token with a
 missing/invalid `sub`, `email`, `role`, or `jti` claim — never reach the Auth
 Service; the Gateway rejects them with `401 Unauthorized` first.
+
+### Task & Progress authorization rules
+
+The Gateway enforces coarse, method/path-based role checks for the Task &
+Progress Service; it does not perform resource-level ownership checks —
+those remain the Task & Progress Service's responsibility.
+
+| Route                                            | Access                                              |
+|----------------------------------------------------|--------------------------------------------------------|
+| `POST /api/v1/tasks`                              | `PROJECT_MANAGER` only                                |
+| `PUT /api/v1/tasks/{id}`                          | `PROJECT_MANAGER` only                                |
+| `DELETE /api/v1/tasks/{id}`                       | `PROJECT_MANAGER` only                                |
+| `PATCH /api/v1/tasks/{id}/assign`                 | `PROJECT_MANAGER` only                                |
+| `GET /api/v1/tasks`, `GET /api/v1/tasks/{id}`     | Authenticated — `USER` or `PROJECT_MANAGER`           |
+| `PATCH /api/v1/tasks/{id}/status`                 | Authenticated — `USER` or `PROJECT_MANAGER`           |
+| `PATCH /api/v1/tasks/{id}/progress`               | Authenticated — `USER` or `PROJECT_MANAGER`           |
+| `GET /api/v1/projects/{projectId}/task-progress-summary` | Authenticated — `USER` or `PROJECT_MANAGER`     |
+
+The status and progress endpoints are intentionally **not** manager-only at
+the Gateway: the Task & Progress Service allows a `USER` to update status or
+progress only on a task they are the assignee of, and returns `403` itself
+for a non-assignee `USER` or an unassigned task. The Gateway passes both
+roles through unchanged and leaves that assignment-aware check to the
+downstream service, to avoid duplicating resource authorization logic.
 
 ### JWT validation at the Gateway
 

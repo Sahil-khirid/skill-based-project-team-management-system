@@ -69,6 +69,14 @@ public class GatewaySecurityConfig {
                                 "/api/v1/projects/*/members/*",
                                 "/api/v1/projects/*/required-skills/*").hasRole("PROJECT_MANAGER")
                         .pathMatchers(HttpMethod.GET, "/api/v1/projects/*/member-recommendations").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.POST, "/api/v1/tasks").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.PUT, "/api/v1/tasks/*").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.DELETE, "/api/v1/tasks/*").hasRole("PROJECT_MANAGER")
+                        .pathMatchers(HttpMethod.PATCH, "/api/v1/tasks/*/assign").hasRole("PROJECT_MANAGER")
+                        // Status and progress updates are intentionally NOT manager-only here: the
+                        // Task & Progress Service's requireManagerOrAssignee(...) allows the assigned
+                        // USER too, so both roles fall through to the authenticated() rule below and
+                        // the downstream service performs the assignee ownership check.
                         .anyExchange().authenticated());
 
         return http.build();
