@@ -8,6 +8,26 @@ spring:
     gateway:
       server:
         webflux:
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowedOrigins:
+                  - ${FRONTEND_ALLOWED_ORIGIN:http://localhost:5173}
+                  - ${FRONTEND_ALLOWED_ORIGIN_ALT:http://127.0.0.1:5173}
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - PATCH
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders:
+                  - Authorization
+                  - Content-Type
+                  - Accept
+                allowCredentials: false
+                maxAge: 3600
           routes:
             - id: auth-service
               uri: lb://AUTH-SERVICE
