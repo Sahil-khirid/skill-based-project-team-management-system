@@ -1,0 +1,39 @@
+import { Route, Routes } from 'react-router-dom';
+import LoadingSpinner from './components/LoadingSpinner';
+import { useAuth } from './auth/useAuth';
+import ProtectedRoute from './auth/ProtectedRoute';
+import MainLayout from './layouts/MainLayout';
+import DashboardPage from './pages/DashboardPage';
+import HomePage from './pages/HomePage';
+import LoginPage from './pages/LoginPage';
+import NotFoundPage from './pages/NotFoundPage';
+import RegisterPage from './pages/RegisterPage';
+import UnauthorizedPage from './pages/UnauthorizedPage';
+
+export default function App() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner label="Checking your session..." />;
+  }
+
+  return (
+    <Routes>
+      <Route element={<MainLayout />}>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  );
+}
