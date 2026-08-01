@@ -160,10 +160,42 @@ below draw a clear line between what is implemented today and what is planned.
 - Routed through the API Gateway at `/api/v1/tasks/**` and
   `/api/v1/projects/*/task-progress-summary` — see "Gateway routes" below.
 
+### Implemented (Frontend Foundation — React/Vite Authentication)
+
+- `frontend` — React + Vite application foundation, styled with Bootstrap.
+- Client-side routing via React Router.
+- A shared Axios client (`frontend/src/api/apiClient.js`) that all frontend
+  API calls go through, targeting the API Gateway (`VITE_API_BASE_URL`,
+  defaulting to `http://localhost:8080`) — the frontend never calls a
+  downstream service port directly.
+- Login, registration, logout, and session restoration via
+  `GET /api/v1/auth/me` are implemented end-to-end against the Gateway.
+- `ProtectedRoute` and `RoleRoute` foundation for gating authenticated and
+  role-specific routes.
+- Business pages for Members 2–4 (skills, projects/teams, tasks/progress) are
+  **not** implemented yet — only the authentication foundation above.
+
+### Implemented (Milestone — Frontend Browser Integration: API Gateway CORS)
+
+- Global CORS policy at the API Gateway (`spring.cloud.gateway.server.webflux.globalcors`)
+  for all API paths (`/**`) — see "CORS policy" under "API Gateway" below.
+- Allowed local frontend origins: `http://localhost:5173` and
+  `http://127.0.0.1:5173` (the React/Vite dev server), overridable via the
+  `FRONTEND_ALLOWED_ORIGIN` / `FRONTEND_ALLOWED_ORIGIN_ALT` environment
+  variables — see `.env.example`.
+- Preflight (`OPTIONS`) requests are permitted at the Gateway's security layer
+  ahead of every JWT/role rule, so browser preflight checks succeed without a
+  token; the real request that follows is still subject to the Gateway's
+  existing JWT authentication and role authorization unchanged.
+- CORS is handled exclusively at the Gateway — the Auth, User & Skill,
+  Project & Team, and Task & Progress services have no browser CORS
+  configuration of their own and are never called directly from the browser.
+
 ### Planned (not yet implemented)
 
-- React (Vite) frontend
-- CORS configuration and frontend integration at the API Gateway
+- Frontend business pages for Members 2–4 (skills, projects/teams,
+  tasks/progress) — see "Implemented (Frontend Foundation — React/Vite
+  Authentication)" above for what already exists.
 
 Advanced deployment infrastructure (Docker, CI/CD, Kubernetes) is excluded from
 Version 1.
@@ -243,8 +275,37 @@ The Eureka Server does **not** require MySQL or any database connection.
   `/api/v1/skills/**`), the Project & Team Service (`/api/v1/projects/**`),
   and the Task & Progress Service (`/api/v1/tasks/**` and
   `/api/v1/projects/*/task-progress-summary`) are implemented.
-- CORS configuration is intentionally **excluded** from this milestone;
-  frontend integration is deferred.
+- The React (Vite) frontend calls the Gateway at `http://localhost:8080` —
+  browsers never call a downstream service port directly. See "CORS policy"
+  below for the browser integration details.
+
+### CORS policy
+
+The Gateway applies a single global CORS policy
+(`spring.cloud.gateway.server.webflux.globalcors`) to every API path
+(`/**`), so downstream services never need their own browser CORS
+configuration and are never called directly from the browser.
+
+- **Allowed origins**: `http://localhost:5173` and `http://127.0.0.1:5173`
+  (the local React/Vite dev server), configurable via the
+  `FRONTEND_ALLOWED_ORIGIN` / `FRONTEND_ALLOWED_ORIGIN_ALT` environment
+  variables — see `.env.example`. No wildcard (`*`) origin is used; in
+  production, set these variables to the deployed frontend's real origin.
+- **Allowed methods**: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`.
+- **Allowed headers**: `Authorization`, `Content-Type`, `Accept`.
+- **Credentials**: not allowed (`allowCredentials: false`) — the frontend
+  authenticates with a bearer JWT, not cookies.
+- **Max age**: `3600` seconds (browsers may cache a preflight result for up
+  to one hour).
+- **Preflight (`OPTIONS`) requests** are permitted by the Gateway's security
+  rules ahead of every JWT/role rule
+  (`.pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()`), so a browser's
+  preflight check succeeds without a token even for protected routes. This
+  only permits the preflight itself — the real request that follows (e.g. the
+  `PATCH` after an `OPTIONS` preflight) still goes through the Gateway's
+  existing JWT authentication and role authorization unchanged; a disallowed
+  origin, a missing/invalid JWT, or an insufficient role is rejected exactly
+  as before this milestone.
 
 ### Gateway routes
 

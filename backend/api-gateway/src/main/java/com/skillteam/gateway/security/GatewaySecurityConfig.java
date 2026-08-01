@@ -1,5 +1,6 @@
 package com.skillteam.gateway.security;
 
+import org.springframework.cloud.gateway.config.GlobalCorsProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -10,6 +11,7 @@ import org.springframework.security.web.server.authentication.AuthenticationWebF
 import org.springframework.security.web.server.authentication.ServerAuthenticationEntryPointFailureHandler;
 import org.springframework.security.web.server.context.NoOpServerSecurityContextRepository;
 import org.springframework.security.web.server.savedrequest.NoOpServerRequestCache;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class GatewaySecurityConfig {
@@ -17,13 +19,16 @@ public class GatewaySecurityConfig {
     private final GatewayReactiveAuthenticationManager authenticationManager;
     private final GatewayAuthenticationEntryPoint authenticationEntryPoint;
     private final GatewayAccessDeniedHandler accessDeniedHandler;
+    private final GlobalCorsProperties globalCorsProperties;
 
     public GatewaySecurityConfig(GatewayReactiveAuthenticationManager authenticationManager,
                                   GatewayAuthenticationEntryPoint authenticationEntryPoint,
-                                  GatewayAccessDeniedHandler accessDeniedHandler) {
+                                  GatewayAccessDeniedHandler accessDeniedHandler,
+                                  GlobalCorsProperties globalCorsProperties) {
         this.authenticationManager = authenticationManager;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.globalCorsProperties = globalCorsProperties;
     }
 
     @Bean
@@ -34,8 +39,18 @@ public class GatewaySecurityConfig {
         authenticationWebFilter.setAuthenticationFailureHandler(
                 new ServerAuthenticationEntryPointFailureHandler(authenticationEntryPoint));
 
+        // Reuses the single CORS policy bound from spring.cloud.gateway.server.webflux.globalcors
+        // (application.yml is the sole source of truth for origins/methods/headers) so that CORS
+        // processing runs as a Spring Security WebFilter, ahead of authentication/authorization.
+        // Without this, a 401/403 produced by the entry point / access-denied handler never passes
+        // through the Gateway routing layer's own CORS handling, and the browser sees a CORS
+        // failure instead of the real error response.
+        UrlBasedCorsConfigurationSource corsConfigurationSource = new UrlBasedCorsConfigurationSource();
+        corsConfigurationSource.setCorsConfigurations(globalCorsProperties.getCorsConfigurations());
+
         http
                 .securityContextRepository(NoOpServerSecurityContextRepository.getInstance())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .formLogin(formLogin -> formLogin.disable())
                 .httpBasic(httpBasic -> httpBasic.disable())
@@ -46,6 +61,10 @@ public class GatewaySecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler))
                 .addFilterAt(authenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(exchange -> exchange
+                        // CORS preflight: browsers send OPTIONS without credentials before the
+                        // real request. This permits only the preflight itself — the actual
+                        // request below still runs through the normal JWT/role rules.
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .pathMatchers(HttpMethod.POST, "/api/v1/auth/refresh").permitAll()
