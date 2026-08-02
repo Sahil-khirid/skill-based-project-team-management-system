@@ -27,3 +27,21 @@ export function updateSkill(id, { name, description }) {
 export function disableSkill(id) {
   return apiClient.delete(`/api/v1/skills/${id}`).then((response) => response.data);
 }
+
+export function getMySkills() {
+  return apiClient.get('/api/v1/users/me/skills').then((response) => response.data);
+}
+
+export function addMySkill({ skillId, proficiencyLevel }) {
+  return apiClient.post('/api/v1/users/me/skills', { skillId, proficiencyLevel }).then((response) => response.data);
+}
+
+export function updateMySkillProficiency(skillId, { proficiencyLevel }) {
+  return apiClient
+    .put(`/api/v1/users/me/skills/${skillId}`, { proficiencyLevel })
+    .then((response) => response.data);
+}
+
+export function removeMySkill(skillId) {
+  return apiClient.delete(`/api/v1/users/me/skills/${skillId}`).then((response) => response.data);
+}
