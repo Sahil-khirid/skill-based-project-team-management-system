@@ -3,6 +3,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import { useAuth } from './auth/useAuth';
 import ProtectedRoute from './auth/ProtectedRoute';
 import MainLayout from './layouts/MainLayout';
+import AvailabilityPage from './pages/availability/AvailabilityPage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -55,6 +56,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MySkillsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/availability"
+          element={
+            <ProtectedRoute>
+              <AvailabilityPage />
             </ProtectedRoute>
           }
         />

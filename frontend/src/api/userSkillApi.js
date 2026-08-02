@@ -45,3 +45,19 @@ export function updateMySkillProficiency(skillId, { proficiencyLevel }) {
 export function removeMySkill(skillId) {
   return apiClient.delete(`/api/v1/users/me/skills/${skillId}`).then((response) => response.data);
 }
+
+export function getMyAvailability() {
+  return apiClient.get('/api/v1/users/me/availability').then((response) => response.data);
+}
+
+export function createMyAvailability({ availableHoursPerWeek }) {
+  return apiClient
+    .post('/api/v1/users/me/availability', { availableHoursPerWeek })
+    .then((response) => response.data);
+}
+
+export function updateMyAvailability({ availableHoursPerWeek }) {
+  return apiClient
+    .put('/api/v1/users/me/availability', { availableHoursPerWeek })
+    .then((response) => response.data);
+}
