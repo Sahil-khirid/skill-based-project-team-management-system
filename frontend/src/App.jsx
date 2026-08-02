@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import RegisterPage from './pages/RegisterPage';
+import SkillsPage from './pages/skills/SkillsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
 export default function App() {
@@ -37,6 +38,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/skills"
+          element={
+            <ProtectedRoute>
+              <SkillsPage />
             </ProtectedRoute>
           }
         />

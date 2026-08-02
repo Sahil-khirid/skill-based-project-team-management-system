@@ -37,6 +37,13 @@ export default function AppNavbar() {
               </Link>
             </li>
           )}
+          {isAuthenticated && (
+            <li className="nav-item">
+              <Link className="nav-link" to="/skills">
+                Skills
+              </Link>
+            </li>
+          )}
         </ul>
 
         <ul className="navbar-nav flex-row gap-3 align-items-lg-center">
