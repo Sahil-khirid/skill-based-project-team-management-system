@@ -11,6 +11,8 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import RegisterPage from './pages/RegisterPage';
 import SkillsPage from './pages/skills/SkillsPage';
+import TaskDetailsPage from './pages/tasks/TaskDetailsPage';
+import TaskListPage from './pages/tasks/TaskListPage';
 import MySkillsPage from './pages/userSkills/MySkillsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 
@@ -64,6 +66,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AvailabilityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <TaskListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks/:id"
+          element={
+            <ProtectedRoute>
+              <TaskDetailsPage />
             </ProtectedRoute>
           }
         />
