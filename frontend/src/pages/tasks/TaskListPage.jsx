@@ -3,8 +3,12 @@ import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as taskApi from '../../api/taskApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useAuth } from '../../auth/useAuth';
 
 export default function TaskListPage() {
+  const { hasRole } = useAuth();
+  const isManager = hasRole('PROJECT_MANAGER');
+
   const [tasks, setTasks] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -50,6 +54,11 @@ export default function TaskListPage() {
       <div className="col-12 col-lg-8">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h1 className="h4 mb-0">Tasks</h1>
+          {isManager && (
+            <Link className="btn btn-primary" to="/tasks/create">
+              Create Task
+            </Link>
+          )}
         </div>
 
         {tasks.length === 0 ? (
@@ -68,6 +77,9 @@ export default function TaskListPage() {
                   <th scope="col">Priority</th>
                   <th scope="col">Progress</th>
                   <th scope="col">Due Date</th>
+                  <th scope="col" className="text-end">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -80,6 +92,14 @@ export default function TaskListPage() {
                     <td>{task.priority}</td>
                     <td>{task.progressPercentage}%</td>
                     <td>{task.dueDate || 'Not set'}</td>
+                    <td className="text-end">
+                      <Link
+                        className="btn btn-outline-secondary btn-sm"
+                        to={`/projects/${task.projectId}/task-progress-summary`}
+                      >
+                        Project Progress Summary
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
