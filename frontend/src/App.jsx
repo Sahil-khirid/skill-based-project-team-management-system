@@ -10,6 +10,8 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import ProjectDetailsPage from './pages/projects/ProjectDetailsPage';
+import ProjectListPage from './pages/projects/ProjectListPage';
 import RegisterPage from './pages/RegisterPage';
 import SkillsPage from './pages/skills/SkillsPage';
 import CreateTaskPage from './pages/tasks/CreateTaskPage';
@@ -73,6 +75,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AvailabilityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <ProjectListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId"
+          element={
+            <ProtectedRoute>
+              <ProjectDetailsPage />
             </ProtectedRoute>
           }
         />
