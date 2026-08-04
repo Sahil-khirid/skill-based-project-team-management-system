@@ -39,6 +39,13 @@ export default function AppNavbar() {
           )}
           {isAuthenticated && (
             <li className="nav-item">
+              <Link className="nav-link" to="/projects">
+                Projects
+              </Link>
+            </li>
+          )}
+          {isAuthenticated && (
+            <li className="nav-item">
               <Link className="nav-link" to="/skills">
                 Skills
               </Link>
