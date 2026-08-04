@@ -14,6 +14,7 @@ import CreateProjectPage from './pages/projects/CreateProjectPage';
 import EditProjectPage from './pages/projects/EditProjectPage';
 import ProjectDetailsPage from './pages/projects/ProjectDetailsPage';
 import ProjectListPage from './pages/projects/ProjectListPage';
+import ProjectRequiredSkillsPage from './pages/projects/ProjectRequiredSkillsPage';
 import RegisterPage from './pages/RegisterPage';
 import SkillsPage from './pages/skills/SkillsPage';
 import CreateTaskPage from './pages/tasks/CreateTaskPage';
@@ -110,6 +111,14 @@ export default function App() {
             <RoleRoute allowedRoles={['PROJECT_MANAGER']}>
               <EditProjectPage />
             </RoleRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/required-skills"
+          element={
+            <ProtectedRoute>
+              <ProjectRequiredSkillsPage />
+            </ProtectedRoute>
           }
         />
         <Route
