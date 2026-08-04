@@ -108,6 +108,9 @@ export default function ProjectDetailsPage() {
                 </button>
               </>
             )}
+            <Link className="btn btn-outline-secondary" to={`/projects/${projectId}/required-skills`}>
+              Required Skills
+            </Link>
             <Link className="btn btn-outline-secondary" to="/projects">
               Back to Projects
             </Link>
