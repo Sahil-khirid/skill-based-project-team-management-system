@@ -4,8 +4,12 @@ import { extractErrorMessage } from '../../api/errorMessage';
 import * as projectApi from '../../api/projectApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { formatDateTime } from '../../utils/formatDate';
+import { useAuth } from '../../auth/useAuth';
 
 export default function ProjectListPage() {
+  const { hasRole } = useAuth();
+  const isManager = hasRole('PROJECT_MANAGER');
+
   const [projects, setProjects] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -51,6 +55,11 @@ export default function ProjectListPage() {
       <div className="col-12 col-lg-8">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <h1 className="h4 mb-0">Projects</h1>
+          {isManager && (
+            <Link className="btn btn-primary" to="/projects/create">
+              Create Project
+            </Link>
+          )}
         </div>
 
         {projects.length === 0 ? (

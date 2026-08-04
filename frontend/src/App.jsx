@@ -10,6 +10,8 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/profile/ProfilePage';
+import CreateProjectPage from './pages/projects/CreateProjectPage';
+import EditProjectPage from './pages/projects/EditProjectPage';
 import ProjectDetailsPage from './pages/projects/ProjectDetailsPage';
 import ProjectListPage from './pages/projects/ProjectListPage';
 import RegisterPage from './pages/RegisterPage';
@@ -87,11 +89,27 @@ export default function App() {
           }
         />
         <Route
+          path="/projects/create"
+          element={
+            <RoleRoute allowedRoles={['PROJECT_MANAGER']}>
+              <CreateProjectPage />
+            </RoleRoute>
+          }
+        />
+        <Route
           path="/projects/:projectId"
           element={
             <ProtectedRoute>
               <ProjectDetailsPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/edit"
+          element={
+            <RoleRoute allowedRoles={['PROJECT_MANAGER']}>
+              <EditProjectPage />
+            </RoleRoute>
           }
         />
         <Route

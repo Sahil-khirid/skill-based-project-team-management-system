@@ -8,6 +8,18 @@ export function getProject(id) {
   return apiClient.get(`/api/v1/projects/${id}`).then((response) => response.data);
 }
 
+export function createProject({ name, description }) {
+  return apiClient.post('/api/v1/projects', { name, description }).then((response) => response.data);
+}
+
+export function updateProject(id, { name, description, status }) {
+  return apiClient.put(`/api/v1/projects/${id}`, { name, description, status }).then((response) => response.data);
+}
+
+export function deleteProject(id) {
+  return apiClient.delete(`/api/v1/projects/${id}`).then((response) => response.data);
+}
+
 export function getProjectMembers(projectId) {
   return apiClient.get(`/api/v1/projects/${projectId}/members`).then((response) => response.data);
 }
