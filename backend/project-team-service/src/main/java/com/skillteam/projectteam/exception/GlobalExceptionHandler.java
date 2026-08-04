@@ -1,5 +1,6 @@
 package com.skillteam.projectteam.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.skillteam.projectteam.dto.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -10,7 +11,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -28,7 +32,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleMalformedJson(HttpMessageNotReadableException ex,
                                                                HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "Malformed request body.", request, List.of());
+        String message = resolveEnumErrorMessage(ex).orElse("Malformed request body.");
+        return buildResponse(HttpStatus.BAD_REQUEST, message, request, List.of());
+    }
+
+    private Optional<String> resolveEnumErrorMessage(HttpMessageNotReadableException ex) {
+        Throwable cause = ex.getCause();
+        if (!(cause instanceof InvalidFormatException ife) || !ife.getTargetType().isEnum()) {
+            return Optional.empty();
+        }
+
+        String fieldName = ife.getPath().isEmpty()
+                ? ife.getTargetType().getSimpleName()
+                : ife.getPath().get(ife.getPath().size() - 1).getFieldName();
+        String allowedValues = Arrays.stream(ife.getTargetType().getEnumConstants())
+                .map(Object::toString)
+                .collect(Collectors.joining(", "));
+
+        return Optional.of(String.format(
+                "Invalid value '%s' for %s. Allowed values are: %s.",
+                ife.getValue(), fieldName, allowedValues));
     }
 
     @ExceptionHandler(UnauthenticatedException.class)

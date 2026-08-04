@@ -71,4 +71,33 @@ class UserSkillServiceClientTest {
 
         mockServer.verify();
     }
+
+    @Test
+    void fetchSkillsWrapsIllegalStateExceptionAsUserSkillServiceUnavailableException() {
+        RestClient.Builder throwingBuilder = RestClient.builder()
+                .requestInterceptor((request, body, execution) -> {
+                    throw new IllegalStateException("simulated load balancer failure");
+                });
+        UserSkillServiceClient throwingClient = new UserSkillServiceClient(throwingBuilder);
+
+        assertThatThrownBy(() -> throwingClient.fetchSkills(42L, 7L, "PROJECT_MANAGER"))
+                .isInstanceOf(UserSkillServiceUnavailableException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void fetchSkillsWrapsNoInstancesAvailableAsUserSkillServiceUnavailableException() {
+        // Mirrors the exact failure Spring Cloud LoadBalancer's interceptor throws when
+        // USER-SKILL-SERVICE has no registered/live instances in Eureka.
+        RestClient.Builder throwingBuilder = RestClient.builder()
+                .requestInterceptor((request, body, execution) -> {
+                    throw new IllegalStateException("No instances available for USER-SKILL-SERVICE");
+                });
+        UserSkillServiceClient throwingClient = new UserSkillServiceClient(throwingBuilder);
+
+        assertThatThrownBy(() -> throwingClient.fetchSkills(42L, 7L, "PROJECT_MANAGER"))
+                .isInstanceOf(UserSkillServiceUnavailableException.class)
+                .hasCauseInstanceOf(IllegalStateException.class)
+                .cause().hasMessageContaining("No instances available for USER-SKILL-SERVICE");
+    }
 }
