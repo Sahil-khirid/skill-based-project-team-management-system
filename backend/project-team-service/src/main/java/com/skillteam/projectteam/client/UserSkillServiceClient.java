@@ -33,7 +33,11 @@ public class UserSkillServiceClient {
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<RemoteUserSkillResponse>>() {
                     });
-        } catch (RestClientException ex) {
+        } catch (RestClientException | IllegalStateException ex) {
+            // IllegalStateException is thrown by Spring Cloud LoadBalancer (e.g. "No instances
+            // available for USER-SKILL-SERVICE") when the downstream service isn't registered in
+            // Eureka; RestClientException covers connection failures and non-2xx responses.
+            // Both mean the downstream is unreachable and must surface as 503, not an unhandled 500.
             throw new UserSkillServiceUnavailableException(
                     "Unable to retrieve skills from User & Skill Service for user " + targetAuthUserId + ".", ex);
         }
