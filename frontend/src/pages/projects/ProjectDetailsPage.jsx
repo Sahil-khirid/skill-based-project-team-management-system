@@ -111,6 +111,14 @@ export default function ProjectDetailsPage() {
             <Link className="btn btn-outline-secondary" to={`/projects/${projectId}/required-skills`}>
               Required Skills
             </Link>
+            <Link className="btn btn-outline-secondary" to={`/projects/${projectId}/members`}>
+              Team Members
+            </Link>
+            {isManager && (
+              <Link className="btn btn-outline-secondary" to={`/projects/${projectId}/recommendations`}>
+                Member Recommendations
+              </Link>
+            )}
             <Link className="btn btn-outline-secondary" to="/projects">
               Back to Projects
             </Link>

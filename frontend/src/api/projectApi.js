@@ -24,6 +24,16 @@ export function getProjectMembers(projectId) {
   return apiClient.get(`/api/v1/projects/${projectId}/members`).then((response) => response.data);
 }
 
+export function addProjectMember(projectId, { authUserId, role }) {
+  return apiClient
+    .post(`/api/v1/projects/${projectId}/members`, { authUserId, role })
+    .then((response) => response.data);
+}
+
+export function removeProjectMember(projectId, authUserId) {
+  return apiClient.delete(`/api/v1/projects/${projectId}/members/${authUserId}`).then((response) => response.data);
+}
+
 export function listProjectRequiredSkills(projectId) {
   return apiClient.get(`/api/v1/projects/${projectId}/required-skills`).then((response) => response.data);
 }
@@ -37,5 +47,11 @@ export function addProjectRequiredSkill(projectId, { skillId, proficiencyLevel }
 export function removeProjectRequiredSkill(projectId, skillId) {
   return apiClient
     .delete(`/api/v1/projects/${projectId}/required-skills/${skillId}`)
+    .then((response) => response.data);
+}
+
+export function getProjectMemberRecommendations(projectId) {
+  return apiClient
+    .get(`/api/v1/projects/${projectId}/member-recommendations`)
     .then((response) => response.data);
 }
