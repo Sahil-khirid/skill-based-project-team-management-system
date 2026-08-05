@@ -14,6 +14,8 @@ import CreateProjectPage from './pages/projects/CreateProjectPage';
 import EditProjectPage from './pages/projects/EditProjectPage';
 import ProjectDetailsPage from './pages/projects/ProjectDetailsPage';
 import ProjectListPage from './pages/projects/ProjectListPage';
+import ProjectMemberRecommendationsPage from './pages/projects/ProjectMemberRecommendationsPage';
+import ProjectMembersPage from './pages/projects/ProjectMembersPage';
 import ProjectRequiredSkillsPage from './pages/projects/ProjectRequiredSkillsPage';
 import RegisterPage from './pages/RegisterPage';
 import SkillsPage from './pages/skills/SkillsPage';
@@ -118,6 +120,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectRequiredSkillsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/recommendations"
+          element={
+            <RoleRoute allowedRoles={['PROJECT_MANAGER']}>
+              <ProjectMemberRecommendationsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/members"
+          element={
+            <ProtectedRoute>
+              <ProjectMembersPage />
             </ProtectedRoute>
           }
         />
