@@ -3,6 +3,7 @@ import { extractErrorMessage } from '../../api/errorMessage';
 import * as userSkillApi from '../../api/userSkillApi';
 import SkillForm from '../../components/userSkill/SkillForm';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
 import { useAuth } from '../../auth/useAuth';
 
 export default function SkillsPage() {
@@ -223,10 +224,13 @@ export default function SkillsPage() {
         )}
 
         {mode === 'list' && skills.length === 0 && (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-3">No active skills are available yet.</p>
-              {isManager && (
+          <EmptyState
+            title="No active skills yet"
+            description={
+              isManager ? 'Add skills to the catalog so members can associate them with their profiles.' : undefined
+            }
+            action={
+              isManager && (
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -235,14 +239,14 @@ export default function SkillsPage() {
                 >
                   Add Skill
                 </button>
-              )}
-            </div>
-          </div>
+              )
+            }
+          />
         )}
 
         {mode === 'list' && skills.length > 0 && (
           <div className="table-responsive">
-            <table className="table table-striped align-middle">
+            <table className="table table-striped table-hover align-middle">
               <thead>
                 <tr>
                   <th scope="col">Name</th>

@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as projectApi from '../../api/projectApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
+import RoleBadge from '../../components/ui/RoleBadge';
 import { formatDateTime } from '../../utils/formatDate';
 import { useAuth } from '../../auth/useAuth';
 
@@ -227,16 +229,26 @@ export default function ProjectMembersPage() {
         )}
 
         {mode === 'list' && members.length === 0 && (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-0">This project has no members yet.</p>
-            </div>
-          </div>
+          <EmptyState
+            title="No members yet"
+            description={
+              isManager
+                ? 'Add members to this project, or check Member Recommendations for eligible candidates.'
+                : 'This project has no members yet.'
+            }
+            action={
+              isManager && (
+                <button type="button" className="btn btn-primary" onClick={handleAddClick} disabled={actionsDisabled}>
+                  Add Member
+                </button>
+              )
+            }
+          />
         )}
 
         {mode === 'list' && members.length > 0 && (
           <div className="table-responsive">
-            <table className="table table-striped align-middle">
+            <table className="table table-striped table-hover align-middle">
               <thead>
                 <tr>
                   <th scope="col">User ID</th>
@@ -254,7 +266,9 @@ export default function ProjectMembersPage() {
                 {members.map((member) => (
                   <tr key={member.id}>
                     <td>{member.authUserId}</td>
-                    <td>{member.role}</td>
+                    <td>
+                      <RoleBadge role={member.role} />
+                    </td>
                     <td>{formatDateTime(member.createdAt)}</td>
                     <td>{formatDateTime(member.updatedAt)}</td>
                     {isManager && (

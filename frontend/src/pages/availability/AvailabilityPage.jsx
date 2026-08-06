@@ -186,7 +186,10 @@ export default function AvailabilityPage() {
         {mode === 'view' && availability && (
           <div className="card shadow-sm">
             <div className="card-body">
-              <h1 className="h4 mb-4">Availability</h1>
+              <div className="d-flex align-items-center gap-2 mb-4">
+                <h1 className="h4 mb-0">Availability</h1>
+                <span className="status-badge status-badge--success">Configured</span>
+              </div>
 
               {successMessage && (
                 <div className="alert alert-success" role="alert">

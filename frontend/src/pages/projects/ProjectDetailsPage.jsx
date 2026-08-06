@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as projectApi from '../../api/projectApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import StatusBadge from '../../components/ui/StatusBadge';
 import { formatDateTime } from '../../utils/formatDate';
 import { useAuth } from '../../auth/useAuth';
 
@@ -139,14 +140,14 @@ export default function ProjectDetailsPage() {
 
         <div className="card shadow-sm">
           <div className="card-body">
-            <h2 className="h5 mb-3">{project.name}</h2>
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+              <h2 className="h5 mb-0">{project.name}</h2>
+              <StatusBadge status={project.status} />
+            </div>
 
             <dl className="row mb-0">
               <dt className="col-sm-4">Description</dt>
               <dd className="col-sm-8">{project.description || 'Not provided'}</dd>
-
-              <dt className="col-sm-4">Status</dt>
-              <dd className="col-sm-8">{project.status}</dd>
 
               <dt className="col-sm-4">Created At</dt>
               <dd className="col-sm-8">{formatDateTime(project.createdAt)}</dd>

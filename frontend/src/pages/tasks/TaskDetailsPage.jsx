@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as taskApi from '../../api/taskApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../auth/useAuth';
 
 const SUCCESS_REDIRECT_DELAY_MS = 1200;
@@ -143,20 +144,32 @@ export default function TaskDetailsPage() {
 
         <div className="card shadow-sm">
           <div className="card-body">
-            <h2 className="h5 mb-3">{task.title}</h2>
+            <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+              <h2 className="h5 mb-0">{task.title}</h2>
+              <StatusBadge status={task.status} />
+              <StatusBadge status={task.priority} />
+            </div>
 
             <dl className="row mb-0">
               <dt className="col-sm-4">Description</dt>
               <dd className="col-sm-8">{task.description || 'Not provided'}</dd>
 
-              <dt className="col-sm-4">Status</dt>
-              <dd className="col-sm-8">{task.status}</dd>
-
-              <dt className="col-sm-4">Priority</dt>
-              <dd className="col-sm-8">{task.priority}</dd>
-
               <dt className="col-sm-4">Progress Percentage</dt>
-              <dd className="col-sm-8">{task.progressPercentage}%</dd>
+              <dd className="col-sm-8">
+                <div className="d-flex align-items-center gap-2" style={{ maxWidth: '20rem' }}>
+                  <div className="progress flex-grow-1">
+                    <div
+                      className="progress-bar"
+                      role="progressbar"
+                      style={{ width: `${task.progressPercentage}%` }}
+                      aria-valuenow={task.progressPercentage}
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                    />
+                  </div>
+                  <span className="small text-muted">{task.progressPercentage}%</span>
+                </div>
+              </dd>
 
               <dt className="col-sm-4">Due Date</dt>
               <dd className="col-sm-8">{task.dueDate || 'Not set'}</dd>

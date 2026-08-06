@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as projectApi from '../../api/projectApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
+import StatusBadge from '../../components/ui/StatusBadge';
 import { formatDateTime } from '../../utils/formatDate';
 import { useAuth } from '../../auth/useAuth';
 
@@ -63,14 +65,24 @@ export default function ProjectListPage() {
         </div>
 
         {projects.length === 0 ? (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-0">No projects are available yet.</p>
-            </div>
-          </div>
+          <EmptyState
+            title="No projects yet"
+            description={
+              isManager
+                ? 'Create your first project to start forming a team.'
+                : 'No projects are available for you yet.'
+            }
+            action={
+              isManager && (
+                <Link className="btn btn-primary" to="/projects/create">
+                  Create Project
+                </Link>
+              )
+            }
+          />
         ) : (
           <div className="table-responsive">
-            <table className="table table-striped align-middle">
+            <table className="table table-striped table-hover align-middle">
               <thead>
                 <tr>
                   <th scope="col">Name</th>
@@ -84,7 +96,9 @@ export default function ProjectListPage() {
                     <td>
                       <Link to={`/projects/${project.id}`}>{project.name}</Link>
                     </td>
-                    <td>{project.status}</td>
+                    <td>
+                      <StatusBadge status={project.status} />
+                    </td>
                     <td>{formatDateTime(project.createdAt)}</td>
                   </tr>
                 ))}

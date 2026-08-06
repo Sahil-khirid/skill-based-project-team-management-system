@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as taskApi from '../../api/taskApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
+import StatusBadge from '../../components/ui/StatusBadge';
 import { useAuth } from '../../auth/useAuth';
 
 export default function TaskListPage() {
@@ -62,14 +64,22 @@ export default function TaskListPage() {
         </div>
 
         {tasks.length === 0 ? (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-0">No tasks are available yet.</p>
-            </div>
-          </div>
+          <EmptyState
+            title="No tasks yet"
+            description={
+              isManager ? 'Create a task to start assigning work.' : 'No tasks have been assigned to you yet.'
+            }
+            action={
+              isManager && (
+                <Link className="btn btn-primary" to="/tasks/create">
+                  Create Task
+                </Link>
+              )
+            }
+          />
         ) : (
           <div className="table-responsive">
-            <table className="table table-striped align-middle">
+            <table className="table table-striped table-hover align-middle">
               <thead>
                 <tr>
                   <th scope="col">Title</th>
@@ -88,16 +98,34 @@ export default function TaskListPage() {
                     <td>
                       <Link to={`/tasks/${task.id}`}>{task.title}</Link>
                     </td>
-                    <td>{task.status}</td>
-                    <td>{task.priority}</td>
-                    <td>{task.progressPercentage}%</td>
+                    <td>
+                      <StatusBadge status={task.status} />
+                    </td>
+                    <td>
+                      <StatusBadge status={task.priority} />
+                    </td>
+                    <td style={{ minWidth: '9rem' }}>
+                      <div className="d-flex align-items-center gap-2">
+                        <div className="progress flex-grow-1">
+                          <div
+                            className="progress-bar"
+                            role="progressbar"
+                            style={{ width: `${task.progressPercentage}%` }}
+                            aria-valuenow={task.progressPercentage}
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                          />
+                        </div>
+                        <span className="small text-muted">{task.progressPercentage}%</span>
+                      </div>
+                    </td>
                     <td>{task.dueDate || 'Not set'}</td>
                     <td className="text-end">
                       <Link
                         className="btn btn-outline-secondary btn-sm"
                         to={`/projects/${task.projectId}/task-progress-summary`}
                       >
-                        Project Progress Summary
+                        Progress Summary
                       </Link>
                     </td>
                   </tr>

@@ -40,11 +40,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="row justify-content-center">
+    <div className="row justify-content-center py-4">
       <div className="col-12 col-md-6 col-lg-5">
-        <div className="card shadow-sm">
+        <div className="card shadow-sm auth-card">
           <div className="card-body">
-            <h1 className="h4 mb-4">Login</h1>
+            <div className="text-center mb-4">
+              <span className="auth-card__logo" aria-hidden="true">
+                ST
+              </span>
+              <h1 className="h4 mb-1">Welcome back</h1>
+              <p className="auth-card__subtitle mb-0">Login to access your dashboard.</p>
+            </div>
 
             {errorMessage && (
               <div className="alert alert-danger" role="alert">
