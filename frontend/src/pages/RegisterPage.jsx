@@ -46,11 +46,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="row justify-content-center">
+    <div className="row justify-content-center py-4">
       <div className="col-12 col-md-6 col-lg-5">
-        <div className="card shadow-sm">
+        <div className="card shadow-sm auth-card">
           <div className="card-body">
-            <h1 className="h4 mb-4">Create an account</h1>
+            <div className="text-center mb-4">
+              <span className="auth-card__logo" aria-hidden="true">
+                ST
+              </span>
+              <h1 className="h4 mb-1">Create an account</h1>
+              <p className="auth-card__subtitle mb-0">Join to start building your project team.</p>
+            </div>
 
             {errorMessage && (
               <div className="alert alert-danger" role="alert">

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as taskApi from '../../api/taskApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import MetricCard from '../../components/ui/MetricCard';
 
 export default function ProjectTaskProgressSummaryPage() {
   const { projectId } = useParams();
@@ -54,29 +55,38 @@ export default function ProjectTaskProgressSummaryPage() {
           <h1 className="h4 mb-0">Project Task Progress Summary</h1>
         </div>
 
+        <div className="card shadow-sm mb-4">
+          <div className="card-body">
+            <div className="d-flex justify-content-between align-items-center mb-2">
+              <span className="form-label mb-0">Overall completion</span>
+              <span className="fw-bold">{summary.completionPercentage}%</span>
+            </div>
+            <div className="progress">
+              <div
+                className="progress-bar"
+                role="progressbar"
+                style={{ width: `${summary.completionPercentage}%` }}
+                aria-valuenow={summary.completionPercentage}
+                aria-valuemin="0"
+                aria-valuemax="100"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="metric-card-grid mb-4">
+          <MetricCard label="Total Tasks" value={summary.totalTasks} />
+          <MetricCard label="To Do" value={summary.todoCount} />
+          <MetricCard label="In Progress" value={summary.inProgressCount} />
+          <MetricCard label="Completed" value={summary.completedCount} />
+          <MetricCard label="Blocked" value={summary.blockedCount} />
+        </div>
+
         <div className="card shadow-sm">
           <div className="card-body">
             <dl className="row mb-0">
               <dt className="col-sm-4">Project ID</dt>
               <dd className="col-sm-8">{summary.projectId}</dd>
-
-              <dt className="col-sm-4">Total Tasks</dt>
-              <dd className="col-sm-8">{summary.totalTasks}</dd>
-
-              <dt className="col-sm-4">TODO Count</dt>
-              <dd className="col-sm-8">{summary.todoCount}</dd>
-
-              <dt className="col-sm-4">IN_PROGRESS Count</dt>
-              <dd className="col-sm-8">{summary.inProgressCount}</dd>
-
-              <dt className="col-sm-4">COMPLETED Count</dt>
-              <dd className="col-sm-8">{summary.completedCount}</dd>
-
-              <dt className="col-sm-4">BLOCKED Count</dt>
-              <dd className="col-sm-8">{summary.blockedCount}</dd>
-
-              <dt className="col-sm-4">Completion Percentage</dt>
-              <dd className="col-sm-8">{summary.completionPercentage}%</dd>
             </dl>
           </div>
         </div>

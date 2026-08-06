@@ -3,10 +3,10 @@ import AppNavbar from '../components/AppNavbar';
 
 export default function MainLayout() {
   return (
-    <div className="d-flex flex-column min-vh-100">
+    <div className="d-flex flex-column min-vh-100 app-shell">
       <AppNavbar />
-      <main className="flex-grow-1">
-        <div className="container pb-5">
+      <main className="flex-grow-1 app-main">
+        <div className="container app-content">
           <Outlet />
         </div>
       </main>

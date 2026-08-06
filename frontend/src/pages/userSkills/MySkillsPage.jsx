@@ -4,13 +4,8 @@ import { extractErrorMessage } from '../../api/errorMessage';
 import * as userSkillApi from '../../api/userSkillApi';
 import UserSkillForm from '../../components/userSkill/UserSkillForm';
 import LoadingSpinner from '../../components/LoadingSpinner';
-
-const PROFICIENCY_LABELS = {
-  BEGINNER: 'Beginner',
-  INTERMEDIATE: 'Intermediate',
-  ADVANCED: 'Advanced',
-  EXPERT: 'Expert',
-};
+import EmptyState from '../../components/ui/EmptyState';
+import ProficiencyBadge from '../../components/ui/ProficiencyBadge';
 
 const PROFILE_MISSING_MESSAGE = 'No profile exists for this user.';
 
@@ -260,18 +255,21 @@ export default function MySkillsPage() {
         )}
 
         {mode === 'list' && mySkills.length === 0 && (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-3">No skills have been added to your profile yet.</p>
-              {eligibleSkills.length > 0 ? (
+          <EmptyState
+            title="No skills added yet"
+            description={
+              eligibleSkills.length > 0
+                ? 'Add skills to your profile so managers can find you for matching projects.'
+                : 'No active catalog skills are available to add.'
+            }
+            action={
+              eligibleSkills.length > 0 && (
                 <button type="button" className="btn btn-primary" onClick={handleAddClick} disabled={actionsDisabled}>
                   Add Skill
                 </button>
-              ) : (
-                <p className="text-muted mb-0">No active catalog skills are available to add.</p>
-              )}
-            </div>
-          </div>
+              )
+            }
+          />
         )}
 
         {mode === 'list' && mySkills.length > 0 && (
@@ -284,7 +282,7 @@ export default function MySkillsPage() {
               </div>
             )}
             <div className="table-responsive">
-              <table className="table table-striped align-middle">
+              <table className="table table-striped table-hover align-middle">
                 <thead>
                   <tr>
                     <th scope="col">Skill</th>
@@ -299,7 +297,9 @@ export default function MySkillsPage() {
                   {mySkills.map((userSkill) => (
                     <tr key={userSkill.id}>
                       <td>{userSkill.skillName}</td>
-                      <td>{PROFICIENCY_LABELS[userSkill.proficiencyLevel] || userSkill.proficiencyLevel}</td>
+                      <td>
+                        <ProficiencyBadge level={userSkill.proficiencyLevel} />
+                      </td>
                       <td>
                         {!userSkill.skillActive && <span className="badge bg-secondary">Disabled in catalog</span>}
                       </td>

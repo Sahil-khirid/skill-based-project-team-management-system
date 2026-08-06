@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { extractErrorMessage } from '../../api/errorMessage';
 import * as projectApi from '../../api/projectApi';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
 
 const PROFICIENCY_LABELS = {
   BEGINNER: 'Beginner',
@@ -69,11 +70,11 @@ export default function ProjectMemberRecommendationsPage() {
         </div>
 
         {recommendations.length === 0 ? (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-0">No suitable members found.</p>
-            </div>
-          </div>
+          <EmptyState
+            title="No suitable members found"
+            description="No eligible users currently match this project's requirements."
+            suggestions={['Review required skills', 'Check member availability', 'Confirm user profiles and skills']}
+          />
         ) : (
           <div className="d-flex flex-column gap-3">
             {recommendations.map((recommendation) => (

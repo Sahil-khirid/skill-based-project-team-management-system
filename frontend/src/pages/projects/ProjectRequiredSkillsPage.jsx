@@ -5,14 +5,9 @@ import * as projectApi from '../../api/projectApi';
 import * as userSkillApi from '../../api/userSkillApi';
 import ProjectRequiredSkillForm from '../../components/project/ProjectRequiredSkillForm';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import EmptyState from '../../components/ui/EmptyState';
+import ProficiencyBadge from '../../components/ui/ProficiencyBadge';
 import { useAuth } from '../../auth/useAuth';
-
-const PROFICIENCY_LABELS = {
-  BEGINNER: 'Beginner',
-  INTERMEDIATE: 'Intermediate',
-  ADVANCED: 'Advanced',
-  EXPERT: 'Expert',
-};
 
 export default function ProjectRequiredSkillsPage() {
   const { projectId } = useParams();
@@ -205,24 +200,29 @@ export default function ProjectRequiredSkillsPage() {
         )}
 
         {mode === 'list' && requiredSkills.length === 0 && (
-          <div className="card shadow-sm">
-            <div className="card-body text-center py-5">
-              <p className="text-muted mb-3">No required skills have been added to this project yet.</p>
-              {isManager &&
-                (eligibleSkills.length > 0 ? (
-                  <button type="button" className="btn btn-primary" onClick={handleAddClick} disabled={actionsDisabled}>
-                    Add Required Skill
-                  </button>
-                ) : (
-                  <p className="text-muted mb-0">No active catalog skills are available to add.</p>
-                ))}
-            </div>
-          </div>
+          <EmptyState
+            title="No required skills yet"
+            description={
+              isManager
+                ? 'Add required skills so this project can be matched against eligible members.'
+                : 'This project has no required skills defined yet.'
+            }
+            action={
+              isManager &&
+              (eligibleSkills.length > 0 ? (
+                <button type="button" className="btn btn-primary" onClick={handleAddClick} disabled={actionsDisabled}>
+                  Add Required Skill
+                </button>
+              ) : (
+                <p className="text-muted mb-0">No active catalog skills are available to add.</p>
+              ))
+            }
+          />
         )}
 
         {mode === 'list' && requiredSkills.length > 0 && (
           <div className="table-responsive">
-            <table className="table table-striped align-middle">
+            <table className="table table-striped table-hover align-middle">
               <thead>
                 <tr>
                   <th scope="col">Skill</th>
@@ -238,7 +238,9 @@ export default function ProjectRequiredSkillsPage() {
                 {requiredSkills.map((requiredSkill) => (
                   <tr key={requiredSkill.id}>
                     <td>{skillNameById.get(requiredSkill.skillId) || `Skill ${requiredSkill.skillId}`}</td>
-                    <td>{PROFICIENCY_LABELS[requiredSkill.proficiencyLevel] || requiredSkill.proficiencyLevel}</td>
+                    <td>
+                      <ProficiencyBadge level={requiredSkill.proficiencyLevel} />
+                    </td>
                     {isManager && (
                       <td className="text-end">
                         <button
